@@ -42,7 +42,7 @@ html.night{
   --cloud2:rgba(255,59,48,.55);
   --rain:#ff3b30;
 }
-html.night #stage{opacity:.78}
+html.night body{opacity:.78}
 
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;background:var(--bg);overflow:hidden;overscroll-behavior:none;
@@ -51,12 +51,12 @@ body{
   font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Hiragino Sans","Helvetica Neue",Inter,system-ui,sans-serif;
   color:var(--label);-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;
 }
-*{transition:color 1.5s ease, fill 1.5s ease, stroke 1.5s ease, background-color 1.5s ease}
 
 #stage{position:fixed;inset:0;display:grid;grid-template-columns:auto auto;justify-content:space-evenly;align-items:center;
   padding:max(env(safe-area-inset-top),4vmin) max(env(safe-area-inset-right),4vmin)
           max(env(safe-area-inset-bottom),4vmin) max(env(safe-area-inset-left),4vmin);
-  transition:transform 4s ease, opacity 1.5s ease}
+  transition:transform 4s ease, opacity .45s ease}
+#stage.fade{opacity:0}
 .clockp{width:min(40vw,82vh);aspect-ratio:1}
 .infop{width:min(46vw,94vh);height:min(40vw,82vh);container-type:size}
 @media (orientation:portrait){
@@ -82,10 +82,10 @@ body{
 
 /* today + weather */
 #top{display:flex;justify-content:space-between;align-items:flex-end;gap:3cqw;padding:0 2.6cqw 3.2cqh}
-#date{flex:none;white-space:nowrap}
+#date{flex:none;white-space:nowrap;color:var(--label)}
 #wday{font-size:4.6cqh;font-weight:600;color:var(--red);letter-spacing:.02em}
-#mday{font-size:9.6cqh;font-weight:600;line-height:1.08;letter-spacing:-.02em;margin-top:.2cqh}
-#wx{min-width:0;text-align:right;opacity:0;transition:opacity 1s ease}
+#mday{color:var(--label);font-size:9.6cqh;font-weight:600;line-height:1.08;letter-spacing:-.02em;margin-top:.2cqh}
+#wx{min-width:0;text-align:right;color:var(--label);opacity:0;transition:opacity 1s ease}
 #wx.on{opacity:1}
 #wxMain{display:flex;align-items:center;justify-content:flex-end;gap:1.2cqh}
 #wxIcon{width:7.6cqh;height:7.6cqh;flex:none}
@@ -361,10 +361,18 @@ async function loadWeather() {
 /* ---------- mode: auto / night / day ---------- */
 const MODES = ['auto','night','day'], LABEL = {auto:'自動', night:'ナイト', day:'デイ'};
 let mode = store.get('mode') || 'auto';
+let modeReady = false, fadeTimer;
 function applyMode() {
   const h = new Date().getHours();
   const night = mode === 'night' || (mode === 'auto' && (h >= 21 || h < 6));
-  document.documentElement.classList.toggle('night', night);
+  const root = document.documentElement;
+  if (root.classList.contains('night') === night && modeReady) return;
+  if (!modeReady) { root.classList.toggle('night', night); modeReady = true; return; }
+  // フェードアウト → 配色を一括で切り替え → フェードイン（要素ごとの色トランジションは使わない）
+  const st = $('stage');
+  st.classList.add('fade');
+  clearTimeout(fadeTimer);
+  fadeTimer = setTimeout(() => { root.classList.toggle('night', night); st.classList.remove('fade'); }, 450);
 }
 let toastTimer;
 function toast(msg) {
