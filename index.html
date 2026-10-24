@@ -126,12 +126,19 @@ body{
 .i-bolt{fill:var(--sun)}
 .i-fog{stroke:var(--cloud2);stroke-width:2.2;stroke-linecap:round}
 
-/* ---------- toast ---------- */
-#toast{position:fixed;left:50%;bottom:max(env(safe-area-inset-bottom),5vmin);transform:translate(-50%,12px);
-  padding:9px 16px;border-radius:999px;background:rgba(44,44,46,.72);-webkit-backdrop-filter:blur(24px) saturate(1.6);backdrop-filter:blur(24px) saturate(1.6);
-  color:var(--label);font-size:13px;font-weight:600;opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;white-space:nowrap}
-#toast.show{opacity:1;transform:translate(-50%,0)}
-html.night #toast{background:rgba(40,0,0,.8)}
+/* ---------- hidden mode button (top-right) ---------- */
+#hot{position:fixed;top:0;right:0;z-index:10;
+  width:calc(150px + env(safe-area-inset-right));height:calc(84px + env(safe-area-inset-top));
+  padding:max(env(safe-area-inset-top),14px) max(env(safe-area-inset-right),14px) 0 0;
+  display:flex;justify-content:flex-end;align-items:flex-start}
+#modeBtn{display:flex;align-items:center;gap:7px;height:36px;padding:0 15px 0 12px;border-radius:999px;
+  background:rgba(44,44,46,.72);-webkit-backdrop-filter:blur(24px) saturate(1.6);backdrop-filter:blur(24px) saturate(1.6);
+  color:var(--label);font-size:14px;font-weight:600;white-space:nowrap;
+  opacity:0;transform:translateY(-6px) scale(.94);transition:opacity .22s ease,transform .22s ease;pointer-events:none}
+#modeBtn svg{width:17px;height:17px;flex:none}
+#hot.show #modeBtn{opacity:1;transform:none}
+#hot.press #modeBtn{transform:scale(.95)}
+html.night #modeBtn{background:rgba(40,0,0,.8)}
 </style>
 </head>
 <body>
@@ -168,7 +175,7 @@ html.night #toast{background:rgba(40,0,0,.8)}
     </section>
   </div>
 </div>
-<div id="toast"></div>
+<div id="hot" aria-label="表示モード"><div id="modeBtn"><svg id="modeIcon" viewBox="0 0 16 16" aria-hidden="true"></svg><span id="modeLabel"></span></div></div>
 <script>
 (() => {
 'use strict';
@@ -374,34 +381,54 @@ function applyMode() {
   clearTimeout(fadeTimer);
   fadeTimer = setTimeout(() => { root.classList.toggle('night', night); st.classList.remove('fade'); }, 450);
 }
-let toastTimer;
-function toast(msg) {
-  const t = $('toast'); t.textContent = msg; t.classList.add('show');
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
+const MODE_ICON = {
+  auto:  '<circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 1.8a6.2 6.2 0 0 1 0 12.4z" fill="currentColor"/>',
+  night: '<path d="M10.2 1.6A6.6 6.6 0 1 0 14.6 11 5.3 5.3 0 0 1 10.2 1.6z" fill="currentColor"/>',
+  day:   '<circle cx="8" cy="8" r="3.2" fill="currentColor"/>' + [0,45,90,135,180,225,270,315].map(a=>{const r=Math.PI*a/180;return `<line x1="${8+5*Math.sin(r)}" y1="${8-5*Math.cos(r)}" x2="${8+6.8*Math.sin(r)}" y2="${8-6.8*Math.cos(r)}" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>`}).join('')
+};
+function renderModeBtn() {
+  $('modeIcon').innerHTML = MODE_ICON[mode];
+  $('modeLabel').textContent = LABEL[mode];
+}
+function cycleMode() {
+  mode = MODES[(MODES.indexOf(mode) + 1) % MODES.length];
+  store.set('mode', mode); applyMode(); renderModeBtn();
 }
 
-/* ---------- input: tap = mode, swipe = month ---------- */
+/* ---------- input ---------- */
+// 右上: 1回目のタップでボタンを表示、表示中にもう1回タップでモード切替。4秒で自動的に隠れる
+const hot = $('hot');
+let hideTimer;
+function hideBtn() { hot.classList.remove('show'); }
+hot.addEventListener('pointerdown', () => hot.classList.add('press'));
+hot.addEventListener('pointerup', e => {
+  e.stopPropagation();
+  hot.classList.remove('press');
+  if (hot.classList.contains('show')) cycleMode();
+  else { renderModeBtn(); hot.classList.add('show'); }
+  clearTimeout(hideTimer); hideTimer = setTimeout(hideBtn, 4000);
+  lockScreen();
+});
+hot.addEventListener('pointercancel', () => hot.classList.remove('press'));
+
+// それ以外: 左右スワイプで月移動（タップでは何もしない。ボタン表示中なら隠す）
 let sx = 0, sy = 0, resetTimer;
 addEventListener('touchstart', e => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, {passive:true});
 addEventListener('touchmove', e => e.preventDefault(), {passive:false});
 addEventListener('touchend', e => {
+  lockScreen();
+  if (hot.contains(e.target)) return;
   const dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy;
   if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
     offset += dx < 0 ? 1 : -1; renderCal();
     clearTimeout(resetTimer); resetTimer = setTimeout(() => { offset = 0; renderCal(); }, 60000);
-  } else if (Math.abs(dx) < 10 && Math.abs(dy) < 10) cycleMode();
-  lockScreen();
+  } else hideBtn();
 });
-addEventListener('click', () => { if (!('ontouchstart' in window)) { cycleMode(); lockScreen(); } });
+addEventListener('pointerup', e => { if (e.pointerType === 'mouse' && !hot.contains(e.target)) { hideBtn(); lockScreen(); } });
 addEventListener('keydown', e => {
   if (e.key === 'ArrowRight') { offset++; renderCal(); }
   if (e.key === 'ArrowLeft')  { offset--; renderCal(); }
 });
-function cycleMode() {
-  mode = MODES[(MODES.indexOf(mode) + 1) % MODES.length];
-  store.set('mode', mode); applyMode();
-  toast(`${LABEL[mode]}モード ・ 祝日データ: ${hsrc}`);
-}
 
 /* ---------- keep screen awake ---------- */
 let wl = null;
