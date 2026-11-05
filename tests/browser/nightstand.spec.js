@@ -250,7 +250,7 @@ test('a custom timer survives reload, pauses, resumes, finishes and clears its b
   await page.clock.fastForward(6000);
   await expect(page.locator('#timerState')).toHaveText('終了');
   await expect(page.locator('#timerBadgeRemaining')).toHaveText('00:00');
-  await expect(page.locator('#timerBadgeDuration')).toHaveText('5秒');
+  await expect(page.locator('#timerBadge')).toHaveText('00:00');
   await page.clock.fastForward(10000);
   await expect(page.locator('#timerBadge')).not.toBeVisible();
   await expect(page.locator('#timerPresets')).toBeVisible();
@@ -360,7 +360,7 @@ test('quick timers use one row, default custom time is ten minutes and start ret
   await expect(page.locator('#timerSeconds')).toHaveValue('0');
   await page.getByRole('button', { name: '開始', exact: true }).click();
   await expect(page.locator('#timerDialog')).not.toBeVisible();
-  await expect(page.locator('#timerBadgeDuration')).toHaveText('10分');
+  await expect(page.locator('#timerBadge')).toHaveText(/^(10:00|09:59)$/);
   await expect(page.getByRole('button', { name: '時計・タイマーを開く' })).toBeFocused();
   await page.locator('#timerBadge').click();
   await expect(page.getByRole('button', { name: '一時停止', exact: true })).toBeVisible();
@@ -372,7 +372,7 @@ test('a finished timer dismisses with one click and does not reopen its controls
   await page.getByRole('button', { name: '1分のタイマーを開始', exact: true }).click();
   await page.clock.fastForward(60000);
   await expect(page.locator('#timerBadge')).toHaveClass(/finished/);
-  await expect(page.locator('#timerBadgeDuration')).toHaveText('1分');
+  await expect(page.locator('#timerBadge')).toHaveText('00:00');
   await page.locator('#timerBadge').click();
   await expect(page.locator('#timerBadge')).not.toBeVisible();
   await expect(page.locator('#timerDialog')).not.toBeVisible();
@@ -443,7 +443,7 @@ test('a rejected sound resume is explained and can be retried without breaking t
   await expect(page.locator('#timerSoundStatus')).toContainText('確認音を再生しました');
   await expect.poll(() => page.evaluate(() => window.audioProbe.starts)).toBe(3);
   await page.getByRole('button', { name: '3分のタイマーを開始', exact: true }).click();
-  await expect(page.locator('#timerBadgeDuration')).toHaveText('3分');
+  await expect(page.locator('#timerBadge')).toHaveText(/^(03:00|02:59)$/);
   expect(errors).toEqual([]);
 });
 

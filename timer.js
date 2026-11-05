@@ -134,7 +134,6 @@
     const badge = $('timerBadge');
     badge.hidden = idle;
     $('timerBadgeRemaining').textContent = format(ms);
-    $('timerBadgeDuration').textContent = duration;
     badge.setAttribute('aria-label', done ? `${duration}のタイマー終了。表示を消す` :
       `${duration}のタイマー。${timer.status === 'paused' ? '一時停止中。' : ''}残り${format(ms)}。タイマーを開く`);
     badge.classList.toggle('finished', done);
@@ -152,7 +151,7 @@
   }
   function init(options = {}) {
     onStart = options.onStart || onStart;
-    $('timerBadge').innerHTML = '<span id="timerBadgeRemaining"></span><span id="timerBadgeDuration"></span>';
+    $('timerBadge').innerHTML = '<span id="timerBadgeRemaining"></span>';
     $('timerContents').innerHTML = `
       <section id="timerPresets" aria-label="よく使うタイマー">
         <p class="sheet-note">タップして開始</p>

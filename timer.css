@@ -23,7 +23,6 @@
 #timerToggle{color:var(--orange)}
 .timer-note{margin-top:22px;text-align:center}
 #timerBadge{position:absolute;top:70%;left:50%;transform:translate(-50%,-50%);padding:2px 4px;border-radius:4px;background:var(--face);color:var(--label2);font-size:clamp(10px,2.6vmin,13px);font-weight:500;white-space:nowrap;line-height:1.2;display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:44px;min-height:36px;touch-action:manipulation}
-#timerBadgeDuration{font-size:.75em;opacity:.75;margin-top:2px}
 .timer-sound{margin-top:16px;text-align:center}
 #timerSoundTest{min-height:44px;padding:8px 16px;border-radius:22px;background:var(--label4);color:var(--label2);font-size:13px}
 #timerSoundStatus:not(:empty){margin-top:8px}
