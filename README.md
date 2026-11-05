@@ -10,11 +10,11 @@ iPhone の StandBy 風に、アナログ時計・カレンダー（日本の祝�
 
 ## 改良版を試す
 
-- [確認用の改良版](https://nightstand-preview.canadie.chatgpt.site/?next=1)（本人のみアクセス可能）
-- [確認用のクラシック](https://nightstand-preview.canadie.chatgpt.site/)
-- 作業ブランチ: `feature/calendar-weather-timer`、[Issue #1](https://github.com/canada/nightstand/issues/1)
+- [改良版](https://canada.github.io/nightstand/?next=1)
+- [クラシック](https://canada.github.io/nightstand/)
+- [確認用サイト](https://nightstand-preview.canadie.chatgpt.site/?next=1)（本人のみアクセス可能）
 
-通常のURLではクラシックを表示し、`?next=1` を付けると追加機能を読み込む。固定位置との併用は `?next=1&lat=35.68&lon=139.76`。GitHub Pagesの公開版への反映には、このブランチの取り込みとデプロイが別途必要。
+通常のURLではクラシックを表示し、`?next=1` を付けると追加機能を読み込む。固定位置との併用は `?next=1&lat=35.68&lon=139.76`。GitHub Pagesは `main` ブランチのルートを配信する。
 
 - 日付の左に西暦を表示。カレンダー上の左右スワイプ、マウスでのドラッグ、左右キーで前月・翌月へ移動し、「今日」で今月に戻る。
 - 天気を押すと現在の詳細、今後12時間、7日間の予報を表示。詳細は開いたときに取得し、15分間キャッシュする。取得できない場合は前回の予報であることを表示し、再取得できる。
