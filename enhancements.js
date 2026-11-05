@@ -7,34 +7,65 @@ const style = document.createElement('link');style.rel='stylesheet';style.href=n
 for(const file of ['weather-detail.css','timer.css']){const link=document.createElement('link');link.rel='stylesheet';link.href=new URL(file,import.meta.url);document.head.append(link);}
 const year=document.createElement('span');year.id='todayYear';
 const dateBody=document.createElement('div');dateBody.append($('wday'),$('mday'));$('date').append(year,dateBody);
+const grid=$('grid');
+const weekdays=document.createElement('div');weekdays.className='calendar-weekdays';
+weekdays.append(...Array.from(grid.querySelectorAll('.wd'),node=>node.cloneNode(true)));
+grid.before(weekdays);
 const controls=document.createElement('nav');controls.id='calControls';controls.setAttribute('aria-label','カレンダーの月移動');
 controls.innerHTML=`<button id="currentMonth" type="button" aria-label="今日のカレンダーに戻る" title="今日に戻る"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8M3 3v5h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`;
 $('date').append(controls);
 $('date').setAttribute('aria-live','polite');
 $('date').setAttribute('aria-atomic','true');
+let calendarObserver;
+function fillMonthEdges(offset,target=grid){
+  // A fresh classic render contains weekday labels; decorated grids do not.
+  const labels=target.querySelectorAll('.wd');
+  if(!labels.length)return;
+  labels.forEach(node=>node.remove());
+  const now=new Date(),base=new Date(now.getFullYear(),now.getMonth()+offset,1);
+  const y=base.getFullYear(),m=base.getMonth(),first=base.getDay();
+  const holidays=store.get('holidays')?.d || {};
+  for(let i=0;i<42;i++){
+    const date=new Date(y,m,i-first+1);
+    const dateKey=`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+    let cell=target.children[i];
+    if(!cell){cell=document.createElement('div');target.append(cell);}
+    if(date.getFullYear()!==y || date.getMonth()!==m){
+      cell.className='d outside-month';
+      cell.textContent=date.getDate();
+      if(holidays[dateKey]){cell.classList.add('hol');cell.title=holidays[dateKey];}
+      cell.setAttribute('aria-label',`${date.getFullYear()}年${date.getMonth()+1}月${date.getDate()}日`);
+    }
+    cell.dataset.date=dateKey;
+  }
+}
 function updateCalendar(){
   const now=new Date(), offset=classic.getMonthOffset();
   const shown=new Date(now.getFullYear(),now.getMonth()+offset,1);
+  calendarObserver?.disconnect();
+  fillMonthEdges(offset);
   year.textContent=`${shown.getFullYear()}年`;
-  $('wday').hidden=offset!==0;
-  $('foot').hidden=offset!==0;
-  $('mday').textContent=offset===0?`${now.getMonth()+1}月${now.getDate()}日`:`${shown.getMonth()+1}月`;
-  controls.hidden=offset===0;
+  $('wday').hidden=true;
+  $('foot').hidden=false;
+  $('foot').classList.toggle('calendar-foot-muted',offset!==0);
+  $('mday').textContent=`${shown.getMonth()+1}月`;
+  controls.hidden=false;
   $('currentMonth').disabled=offset===0;
-  $('grid').setAttribute('aria-label',`${shown.getFullYear()}年${shown.getMonth()+1}月のカレンダー`);
+  grid.setAttribute('aria-label',`${shown.getFullYear()}年${shown.getMonth()+1}月のカレンダー`);
+  calendarObserver?.observe(grid,{childList:true});
 }
-new MutationObserver(updateCalendar).observe($('grid'),{childList:true});updateCalendar();
+calendarObserver=new MutationObserver(updateCalendar);updateCalendar();
 function changeMonth(delta){classic.setMonthOffset(classic.getMonthOffset()+delta);lockScreen();}
 $('currentMonth').addEventListener('click',()=>classic.setMonthOffset(0));
 const info=$('info');
-const grid=$('grid');
 const viewport=document.createElement('div');viewport.className='calendar-viewport';
 grid.before(viewport);viewport.append(grid);
-let swipe=null, settling=false, settleTimer=null;
+let swipe=null, settling=false, settleTimer=null, wheelTimer=null;
 let previews=[];
 const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
 function resetSwipe(){
   clearTimeout(settleTimer);settleTimer=null;
+  clearTimeout(wheelTimer);wheelTimer=null;
   swipe=null;settling=false;
   for(const preview of previews)preview.remove();
   previews=[];
@@ -42,32 +73,46 @@ function resetSwipe(){
   viewport.classList.remove('dragging');
 }
 function makePreviews(offset){
+  const now=new Date();
+  const monthStart=value=>{
+    const date=new Date(now.getFullYear(),now.getMonth()+value,1);
+    return Date.UTC(date.getFullYear(),date.getMonth(),1-date.getDay());
+  };
+  const start=monthStart(offset),rowHeight=grid.clientHeight/6;
   try{
     for(const delta of [-1,1]){
       classic.setMonthOffset(offset+delta);
+      fillMonthEdges(offset+delta);
       const preview=grid.cloneNode(true);
       preview.removeAttribute('id');preview.removeAttribute('aria-label');
       preview.className='calendar-preview';preview.setAttribute('aria-hidden','true');
       preview.dataset.side=delta;
+      const shift=(monthStart(offset+delta)-start)/(7*864e5)*rowHeight;
+      preview.dataset.shift=shift;
+      // Adjacent month grids share weeks. Show each week only once while moving.
+      const overlap=Math.max(0,grid.clientHeight-Math.abs(shift));
+      preview.style.clipPath=delta>0?`inset(${overlap}px 0 0)`:`inset(0 0 ${overlap}px)`;
       previews.push(preview);
     }
   }finally{classic.setMonthOffset(offset);}
   viewport.append(...previews);
 }
-function movePages(dx,width,transition='none'){
-  grid.style.transition=transition;grid.style.transform=`translate3d(${dx}px,0,0)`;
+function movePages(dy,transition='none'){
+  grid.style.transition=transition;grid.style.transform=`translate3d(0,${dy}px,0)`;
   for(const preview of previews){
     preview.style.transition=transition;
-    preview.style.transform=`translate3d(${Number(preview.dataset.side)*width+dx}px,0,0)`;
+    preview.style.transform=`translate3d(0,${Number(preview.dataset.shift)+dy}px,0)`;
   }
 }
 function finishSwipe(commit){
   const gesture=swipe;swipe=null;
+  clearTimeout(wheelTimer);wheelTimer=null;
   if(!gesture?.started)return;
   settling=true;
-  const direction=gesture.dx<0?1:-1;
+  const direction=gesture.dy<0?1:-1;
+  const shift=Number(previews.find(preview=>Number(preview.dataset.side)===direction).dataset.shift);
   const duration=reducedMotion.matches?0:180;
-  movePages(commit?-direction*gesture.width:0,gesture.width,`transform ${duration}ms cubic-bezier(.2,.8,.2,1)`);
+  movePages(commit?-shift:0,`transform ${duration}ms cubic-bezier(.2,.8,.2,1)`);
   settleTimer=setTimeout(()=>{
     // A keyboard or Today action during the animation takes precedence.
     if(commit && classic.getMonthOffset()===gesture.offset)changeMonth(direction);
@@ -78,8 +123,9 @@ function finishSwipe(commit){
 info.addEventListener('pointerdown',e=>{
   if(!e.isPrimary){if(swipe)finishSwipe(false);return;}
   if(settling || e.button!==0 || e.target.closest('button,#wx'))return;
-  swipe={id:e.pointerId,x:e.clientX,y:e.clientY,dx:0,offset:classic.getMonthOffset(),
-    width:viewport.clientWidth,started:false,time:performance.now()};
+  if(swipe?.id==='wheel')resetSwipe();
+  swipe={id:e.pointerId,x:e.clientX,y:e.clientY,dy:0,offset:classic.getMonthOffset(),
+    height:grid.clientHeight,started:false,time:performance.now()};
   info.setPointerCapture(e.pointerId);
 });
 info.addEventListener('pointermove',e=>{
@@ -87,22 +133,41 @@ info.addEventListener('pointermove',e=>{
   const dx=e.clientX-swipe.x,dy=e.clientY-swipe.y;
   if(!swipe.started){
     if(Math.max(Math.abs(dx),Math.abs(dy))<6)return;
-    if(Math.abs(dy)>Math.abs(dx)){swipe=null;return;}
+    if(Math.abs(dx)>Math.abs(dy)){swipe=null;return;}
     swipe.started=true;makePreviews(swipe.offset);viewport.classList.add('dragging');
   }
-  swipe.dx=Math.max(-swipe.width,Math.min(swipe.width,dx));
-  movePages(swipe.dx,swipe.width);
+  swipe.dy=Math.max(-swipe.height,Math.min(swipe.height,dy));
+  movePages(swipe.dy);
 });
 info.addEventListener('pointerup',e=>{
   if(!swipe || swipe.id!==e.pointerId)return;
   if(!swipe.started){swipe=null;return;}
-  swipe.dx=Math.max(-swipe.width,Math.min(swipe.width,e.clientX-swipe.x));
-  const distance=Math.abs(swipe.dx),elapsed=Math.max(1,performance.now()-swipe.time);
-  const threshold=Math.max(30,Math.min(80,swipe.width*.18));
+  swipe.dy=Math.max(-swipe.height,Math.min(swipe.height,e.clientY-swipe.y));
+  const distance=Math.abs(swipe.dy),elapsed=Math.max(1,performance.now()-swipe.time);
+  const threshold=Math.max(30,Math.min(80,swipe.height*.18));
   finishSwipe(distance>=threshold || (distance>=25 && distance/elapsed>.5));
 });
 info.addEventListener('pointercancel',()=>finishSwipe(false));
 info.addEventListener('lostpointercapture',()=>{if(swipe)finishSwipe(false);});
+info.addEventListener('wheel',e=>{
+  if(e.ctrlKey || Math.abs(e.deltaX)>Math.abs(e.deltaY) || !e.deltaY || e.target.closest('button,#wx'))return;
+  e.preventDefault();
+  if(settling || (swipe && swipe.id!=='wheel'))return;
+  if(!swipe){
+    swipe={id:'wheel',dy:0,offset:classic.getMonthOffset(),height:grid.clientHeight,started:true};
+    makePreviews(swipe.offset);viewport.classList.add('dragging');
+  }
+  const factor=e.deltaMode===1?16:e.deltaMode===2?swipe.height:1;
+  swipe.dy=Math.max(-swipe.height,Math.min(swipe.height,swipe.dy-e.deltaY*factor));
+  movePages(swipe.dy);
+  clearTimeout(wheelTimer);
+  wheelTimer=setTimeout(()=>finishSwipe(Math.abs(swipe.dy)>=Math.max(30,Math.min(80,swipe.height*.18))),120);
+},{passive:false});
+addEventListener('keydown',e=>{
+  if(document.querySelector('dialog[open]') || e.target.closest('input,select,textarea,[contenteditable]'))return;
+  if(e.key==='ArrowDown'){e.preventDefault();changeMonth(1);}
+  if(e.key==='ArrowUp'){e.preventDefault();changeMonth(-1);}
+});
 addEventListener('resize',resetSwipe);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)resetSwipe();});
 // Prevent the classic swipe listener from handling the same gesture twice.
