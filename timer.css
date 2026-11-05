@@ -3,6 +3,12 @@
 .timer-preset span{font-size:clamp(30px,8vw,46px);font-weight:400;line-height:1.1;letter-spacing:-.04em}
 .timer-preset small{font-size:14px;color:var(--label2)}
 .timer-preset:active{background:var(--label3)}
+.timer-custom{max-width:440px;margin:0 auto;padding-top:16px;border-top:1px solid var(--label4)}
+.timer-custom-controls{display:flex;align-items:center;gap:12px;margin-top:12px}
+.timer-custom label{display:flex;align-items:center;gap:7px;flex:1;min-width:0;color:var(--label2);font-size:14px}
+.timer-custom input{min-width:0;width:100%;height:48px;padding:8px;border:1px solid var(--label4);border-radius:14px;background:var(--bg);color:var(--label);text-align:center;font-size:22px;font-variant-numeric:tabular-nums;-webkit-user-select:text;user-select:text}
+.timer-custom button{height:48px;padding:10px 20px;border-radius:24px;background:var(--label4);color:var(--orange)}
+#timerCustomError:not(:empty){margin-top:10px;color:var(--red)}
 .timer-dial{width:min(260px,60vw);aspect-ratio:1;position:relative;margin:0 auto 22px}
 .timer-dial svg{width:100%;height:100%;transform:rotate(-90deg)}
 .timer-dial circle{fill:none;stroke-width:3;stroke-linecap:round}
@@ -16,8 +22,8 @@
 .timer-actions button{min-width:116px;min-height:48px;padding:12px 16px;border-radius:30px;background:var(--label4);color:var(--label)}
 #timerToggle{color:var(--orange)}
 .timer-note{margin-top:22px;text-align:center}
-#timerBadge{position:fixed;bottom:max(12px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);padding:8px 16px;border:1px solid var(--label4);border-radius:24px;background:var(--face);color:var(--orange);font-size:14px;font-weight:500;z-index:3}
+#timerBadge{position:absolute;top:70%;left:50%;transform:translate(-50%,-50%);padding:3px 6px;border-radius:8px;background:var(--face);color:var(--label2);font-size:clamp(10px,2.8vmin,14px);font-weight:500;white-space:nowrap;pointer-events:none}
 #timerBadge[hidden]{display:none}
-#timerBadge.finished{border-color:var(--orange)}
+#timerBadge.finished{color:var(--orange)}
 #timerActive.finished .timer-track{stroke:var(--orange)}
 @media(max-height:450px) and (min-width:550px){.timer-presets{grid-template-columns:repeat(6,minmax(0,1fr));max-width:none;gap:12px;margin:18px 0}.timer-preset span{font-size:30px}.timer-dial{width:180px;margin-bottom:0}.timer-actions{flex-direction:column;gap:12px;justify-content:center}#timerActive:not([hidden]){display:flex;align-items:center;justify-content:center;gap:42px}#timerReadout{font-size:38px}.timer-note{margin-top:16px}}

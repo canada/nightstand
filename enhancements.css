@@ -2,21 +2,19 @@
 button,input{font:inherit}
 button{color:inherit;cursor:pointer;-webkit-appearance:none;appearance:none;border:0}
 button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--orange);outline-offset:4px}
-.clockp{background:none;padding:0;border-radius:50%;touch-action:manipulation}
+.clockp{position:relative;background:none;padding:0;border-radius:50%;touch-action:manipulation}
+#info{touch-action:none}
 #date{display:flex;align-items:flex-end;gap:1.4cqw}
-#todayYear{font-size:3.8cqh;font-weight:500;color:var(--label2);line-height:1.5}
+#todayYear{font-size:5.8cqh;font-weight:600;color:var(--label2);line-height:1.35}
 #mday{font-size:8.7cqh}
 #wx{background:none;padding:0;touch-action:manipulation;opacity:1}
 #wx:not(.on) #wxSub{font-size:3.4cqh}
-#calControls{display:flex;flex:none;align-items:center;justify-content:space-between;padding:0 1cqw 1cqh;gap:1cqw}
+#calControls{display:flex;flex:none;align-items:center;justify-content:space-between;min-height:44px;padding:0 2.6cqw 1cqh;gap:1cqw}
 #calPeriod{display:flex;align-items:baseline;justify-content:center;gap:1cqw;min-width:0}
-#selectedMonth{color:var(--label);font-size:4.1cqh}
-#selectedYear{font-size:3.4cqh}
-.cal-nav{background:none;border-radius:50%;width:44px;height:44px;flex:none;display:grid;place-items:center;color:var(--label2)}
-.cal-nav svg{width:18px;height:18px}
-#currentMonth{font-size:3.1cqh;color:var(--orange);padding:5px 7px;border-radius:14px;background:var(--label4);white-space:nowrap}
+#selectedMonth{color:var(--label);font-size:4.6cqh}
+#selectedYear{font-size:4.6cqh;color:var(--label2)}
+#currentMonth{font-size:3.4cqh;color:var(--orange);min-height:40px;padding:8px 12px;border-radius:18px;background:var(--label4);white-space:nowrap}
 #currentMonth:disabled{visibility:hidden;pointer-events:none}
-#calActions{display:flex;align-items:center;gap:.3cqw}
 #classicLink{position:fixed;bottom:max(8px,env(safe-area-inset-bottom));left:max(12px,env(safe-area-inset-left));color:var(--label3);font-size:11px;text-decoration:none;padding:6px;z-index:2}
 .sheet{margin:auto;width:min(680px,calc(100% - 24px));max-height:calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));padding:24px;border:1px solid var(--label4);border-radius:28px;background:var(--face);color:var(--label);overflow:auto;overscroll-behavior:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch;color-scheme:dark}
 .sheet::backdrop{background:rgba(0,0,0,.78);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
