@@ -114,6 +114,8 @@ for(const event of ['touchstart','touchmove','touchend'])document.addEventListen
 document.addEventListener('keydown',e=>{if(document.querySelector('dialog[open]'))e.stopPropagation();},true);
 function makeTrigger(node,label,open){node.setAttribute('role','button');node.tabIndex=0;node.setAttribute('aria-label',label);node.setAttribute('aria-haspopup','dialog');node.addEventListener('click',open);node.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}});}
 if(!$('wxSub').textContent)$('wxSub').textContent='天気予報を開く';
+if(!$('wxTemp').textContent)$('wxTemp').textContent='—';
+$('wx').title='天気予報の詳細';
 makeTrigger($('wx'),'天気予報の詳細を開く',()=>{$('weatherDialog').showModal();lockScreen();loadWeather();});
 const clock=document.querySelector('.clockp');
 const badge=document.createElement('span');badge.id='timerBadge';badge.hidden=true;badge.setAttribute('aria-live','off');clock.append(badge);
