@@ -3,12 +3,14 @@ button,input{font:inherit}
 button{color:inherit;cursor:pointer;-webkit-appearance:none;appearance:none;border:0}
 button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--orange);outline-offset:4px}
 .clockp{position:relative;background:none;padding:0;border-radius:50%;touch-action:manipulation}
-#info{touch-action:none}
+#info{touch-action:none;--calendar-sunday:#f58b83;--calendar-saturday:#8db9ed}
+html.night #info{--calendar-sunday:var(--label);--calendar-saturday:var(--label2)}
 #date{display:flex;align-items:flex-end;gap:1.4cqw}
-#todayYear{font-size:5.8cqh;font-weight:600;color:var(--label2);line-height:1.35}
-#mday{font-size:8.7cqh}
-#wx{background:none;padding:0;touch-action:manipulation;opacity:1}
-#wx:not(.on) #wxSub{font-size:3.4cqh}
+#todayYear{font-size:6cqh;font-weight:600;color:var(--label2);line-height:1.35}
+#mday{font-size:9.6cqh}
+#wx{display:flex;align-items:flex-end;justify-content:center;min-width:44px;min-height:44px;background:none;padding:0;touch-action:manipulation;cursor:pointer;opacity:1}
+#wxSub,#wxSub2{display:none}
+#wxMain{opacity:.85}
 #calControls{display:flex;flex:none;align-items:center;padding:0}
 #calControls[hidden]{display:none}
 #foot[hidden]{display:none}
@@ -28,6 +30,12 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(-
 .calendar-preview .today{background:var(--red);color:var(--onRed);font-weight:700}
 .calendar-preview .today.hol::after{bottom:-1.9cqh}
 .calendar-preview .blank{visibility:hidden}
+:is(#grid,.calendar-preview) .wd{font-size:4.1cqh;color:var(--label2)}
+:is(#grid,.calendar-preview) .d{height:min(8.8cqh,100%);font-size:6.2cqh;font-weight:600}
+:is(#grid,.calendar-preview) .wd:nth-child(1),:is(#grid,.calendar-preview) .d:nth-child(7n+1):not(.today){color:var(--calendar-sunday)}
+:is(#grid,.calendar-preview) .wd:nth-child(7),:is(#grid,.calendar-preview) .d:nth-child(7n):not(.today){color:var(--calendar-saturday)}
+:is(#grid,.calendar-preview) .hol:not(.today){color:var(--calendar-sunday)}
+:is(#grid,.calendar-preview) .today{color:var(--onRed);font-weight:700}
 #classicLink{position:fixed;bottom:max(8px,env(safe-area-inset-bottom));left:max(12px,env(safe-area-inset-left));color:var(--label3);font-size:11px;text-decoration:none;padding:6px;z-index:2}
 .sheet{margin:auto;width:min(680px,calc(100% - 24px));max-height:calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));padding:24px;border:1px solid var(--label4);border-radius:28px;background:var(--face);color:var(--label);overflow:auto;overscroll-behavior:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch;color-scheme:dark}
 .sheet::backdrop{background:rgba(0,0,0,.78);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
