@@ -1,10 +1,13 @@
 import './weather-detail.js';
 import './timer.js';
+import {teamsConfig} from './teams-config.js';
+import {initTeamsCalendar} from './teams-calendar.js';
 const classic = window.NightstandClassic;
 const $ = id => document.getElementById(id);
 const {store, icons:ICON, describeWeather:wmo, getPosition:getPos, renderWeather:renderWx, lockScreen} = classic;
 const style = document.createElement('link');style.rel='stylesheet';style.href=new URL('enhancements.css',import.meta.url);document.head.append(style);
-for(const file of ['weather-detail.css','timer.css']){const link=document.createElement('link');link.rel='stylesheet';link.href=new URL(file,import.meta.url);document.head.append(link);}
+for(const file of ['weather-detail.css','timer.css','teams-calendar.css']){const link=document.createElement('link');link.rel='stylesheet';link.href=new URL(file,import.meta.url);document.head.append(link);}
+let teamsCalendar=null;
 const year=document.createElement('span');year.id='todayYear';
 const dateBody=document.createElement('div');dateBody.append($('wday'),$('mday'));$('date').append(year,dateBody);
 const controls=document.createElement('nav');controls.id='calControls';controls.setAttribute('aria-label','カレンダーの月移動');
@@ -22,6 +25,7 @@ function updateCalendar(){
   controls.hidden=offset===0;
   $('currentMonth').disabled=offset===0;
   $('grid').setAttribute('aria-label',`${shown.getFullYear()}年${shown.getMonth()+1}月のカレンダー`);
+  teamsCalendar?.setMonthOffset(offset);
 }
 new MutationObserver(updateCalendar).observe($('grid'),{childList:true});updateCalendar();
 function changeMonth(delta){classic.setMonthOffset(classic.getMonthOffset()+delta);lockScreen();}
@@ -124,6 +128,7 @@ function openTimer(){NightstandTimer.open();$('timerDialog').showModal();lockScr
 makeTrigger(clock,'時計・タイマーを開く',openTimer);
 NightstandWeather.showStatus('天気予報を取得しています…');
 let weatherPromise = null;
+teamsCalendar=initTeamsCalendar({config:teamsConfig,offset:classic.getMonthOffset()});
 function showForecast(forecast) {
   const c = forecast.current, d = forecast.daily;
   renderWx({temp:c.temperature_2m,code:c.weather_code,isDay:!!c.is_day,
