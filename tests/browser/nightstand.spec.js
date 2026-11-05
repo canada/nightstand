@@ -32,6 +32,63 @@ async function goNext(page) {
   await page.keyboard.press('ArrowDown');
 }
 
+async function exerciseBasicFeatures(page) {
+  await expect(page.locator('#mday')).toHaveText('11月');
+  await drag(page, -90);
+  await expect(page.locator('#mday')).toHaveText('12月');
+  await page.getByRole('button', { name: '時計・タイマーを開く' }).click();
+  await page.getByRole('button', { name: '1分のタイマーを開始', exact: true }).click();
+  await expect(page.getByRole('button', { name: '一時停止', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'キャンセル', exact: true }).click();
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: '天気予報の詳細を開く' }).click();
+  await expect(page.locator('.forecast-day')).toHaveCount(7);
+  await page.keyboard.press('Escape');
+}
+
+test('basic features remain usable when the weekly module fails to load', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  const failed = page.waitForEvent('requestfailed', {
+    predicate: (request) => new URL(request.url()).pathname === '/week-calendar.js'
+  });
+  await page.route(
+    (target) => target.pathname === '/week-calendar.js',
+    (route) => route.abort('failed')
+  );
+  await page.goto(url, { waitUntil: 'domcontentloaded' });
+  await failed;
+  await exerciseBasicFeatures(page);
+  await expect(page.getByRole('button', { name: /週を開く/ })).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('basic features work while the weekly module is pending and its latest month loads later', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  let release;
+  const pending = new Promise((resolve) => { release = resolve; });
+  const requested = page.waitForRequest((request) => new URL(request.url()).pathname === '/week-calendar.js');
+  await page.route((target) => target.pathname === '/week-calendar.js', async (route) => {
+    await pending;
+    await route.continue();
+  });
+  try {
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
+    await requested;
+    await exerciseBasicFeatures(page);
+    await expect(page.getByRole('button', { name: /週を開く/ })).toHaveCount(0);
+  } finally {
+    release();
+  }
+  const week = page.getByRole('button', { name: /11月29日から12月5日の週を開く/ });
+  await expect(week).toBeVisible();
+  await week.click();
+  await expect(page.locator('#weekTitle')).toHaveText('11月29日〜12月5日');
+  await expect(page.locator('#mday')).toHaveText('12月');
+  expect(errors).toEqual([]);
+});
+
 test('an old unversioned module cannot replace the current release', async ({ page }) => {
   const resources = [];
   page.on('request', (request) => resources.push(request.url()));

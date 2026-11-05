@@ -12,14 +12,13 @@ for (const file of ['enhancements.css', 'weather-detail.css', 'timer.css', 'week
   link.href = assetURL(file);
   document.head.append(link);
 }
-const [dates, ui, month, gestures, forecast, week] = await Promise.all(
+const [dates, ui, month, gestures, forecast] = await Promise.all(
   [
     'calendar-dates.js',
     'sheets.js',
     'month-calendar.js',
     'calendar-gestures.js',
     'forecast.js',
-    'week-calendar.js',
     'weather-detail.js',
     'timer.js'
   ].map((file) => import(assetURL(file)))
@@ -70,4 +69,11 @@ ui.makeTrigger(clock, '時計・タイマーを開く', () => {
   timerDialog.showModal();
   classic.lockScreen();
 });
-week.initWeekCalendar({ classic, calendar, dates, ui, canOpen: navigation.canOpenWeek });
+// Weekly view is optional: its loading must not block the basic features.
+import(assetURL('week-calendar.js'))
+  .then(({ initWeekCalendar }) => {
+    initWeekCalendar({ classic, calendar, dates, ui, canOpen: navigation.canOpenWeek });
+  })
+  .catch((error) => {
+    console.warn('週間カレンダーを読み込めませんでした。', error);
+  });
