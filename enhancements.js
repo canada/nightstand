@@ -8,9 +8,19 @@ for(const file of ['weather-detail.css','timer.css']){const link=document.create
 const year=document.createElement('span');year.id='todayYear';
 const dateBody=document.createElement('div');dateBody.append($('wday'),$('mday'));$('date').append(year,dateBody);
 const controls=document.createElement('nav');controls.id='calControls';controls.setAttribute('aria-label','カレンダーの月移動');
-controls.innerHTML=`<div id="calPeriod" aria-live="polite" aria-atomic="true"><span id="selectedYear"></span><span id="selectedMonth"></span></div><button id="currentMonth" type="button" aria-label="今日のカレンダーに戻る">今日</button>`;
+controls.innerHTML=`<div id="calPeriod" aria-live="polite" aria-atomic="true"><span id="selectedYear"></span><span id="selectedMonth"></span></div><button id="currentMonth" type="button" aria-label="今日のカレンダーに戻る" title="今日に戻る"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 3v4m8-4v4M4 10h16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><text id="todayNumber" x="12" y="18.5" text-anchor="middle" fill="currentColor" font-size="8" font-weight="600"></text></svg></button>`;
 $('grid').before(controls);
-function updateCalendar(){const now=new Date();const shown=new Date(now.getFullYear(),now.getMonth()+classic.getMonthOffset(),1);year.textContent=`${now.getFullYear()}年`;$('selectedYear').textContent=`${shown.getFullYear()}年`;$('selectedMonth').textContent=`${shown.getMonth()+1}月`;$('currentMonth').disabled=classic.getMonthOffset()===0;$('grid').setAttribute('aria-label',`${shown.getFullYear()}年${shown.getMonth()+1}月のカレンダー`);}
+function updateCalendar(){
+  const now=new Date(), offset=classic.getMonthOffset();
+  const shown=new Date(now.getFullYear(),now.getMonth()+offset,1);
+  year.textContent=`${now.getFullYear()}年`;
+  $('selectedYear').textContent=`${shown.getFullYear()}年`;
+  $('selectedMonth').textContent=`${shown.getMonth()+1}月`;
+  $('todayNumber').textContent=now.getDate();
+  controls.hidden=offset===0;
+  $('currentMonth').disabled=offset===0;
+  $('grid').setAttribute('aria-label',`${shown.getFullYear()}年${shown.getMonth()+1}月のカレンダー`);
+}
 new MutationObserver(updateCalendar).observe($('grid'),{childList:true});updateCalendar();
 function changeMonth(delta){classic.setMonthOffset(classic.getMonthOffset()+delta);lockScreen();}
 $('currentMonth').addEventListener('click',()=>classic.setMonthOffset(0));

@@ -1,6 +1,7 @@
 (() => {
   'use strict';
   const STORAGE_KEY = 'nsTimerV1';
+  const FINISHED_BADGE_MS = 30000;
   const $ = id => document.getElementById(id);
   const circumference = 2*Math.PI*52;
   let timer = {status:'idle',duration:0,remaining:0,deadline:0};
@@ -48,6 +49,7 @@
     return `${minutes?`${minutes}分`:''}${seconds%60?`${seconds%60}秒`:''}`;
   }
   function finish(sound=true) {
+    timer.finishedAt=timer.deadline || Date.now();
     timer.status='finished';timer.remaining=0;timer.deadline=0;save();
     $('timerAnnouncement').textContent='タイマーが終了しました。';
     if(sound)notify();
@@ -63,7 +65,8 @@
     $('timerProgress').style.strokeDashoffset=String(circumference*(1-(timer.duration?ms/timer.duration:0)));
     $('timerToggle').textContent=done?'もう一度':timer.status==='paused'?'再開':'一時停止';
     $('timerCancel').textContent=done?'完了':'キャンセル';
-    const badge=$('timerBadge');badge.hidden=idle;
+    const finishedAt=Number.isFinite(timer.finishedAt)?timer.finishedAt:0;
+    const badge=$('timerBadge');badge.hidden=idle || (done && Date.now()-finishedAt>=FINISHED_BADGE_MS);
     badge.textContent=done?'タイマー終了':`${timer.status==='paused'?'一時停止 · ':''}${format(ms)}`;
     badge.setAttribute('aria-label',done?'タイマー終了。開く':`残り${format(ms)}。タイマーを開く`);
     badge.classList.toggle('finished',done);
