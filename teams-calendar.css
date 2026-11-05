@@ -1,0 +1,24 @@
+.info-stack{display:flex;flex-direction:column;width:min(46vw,94vh);max-height:calc(100dvh - 8vmin)}
+.info-stack>.infop{width:100%;flex-shrink:1;min-height:0}
+.teams-panel{flex:none;padding:4px 8px 0;margin:0 2%;border-top:1px solid var(--label4);color:var(--label)}
+.teams-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:24px}
+.teams-heading h3{font-size:11px;font-weight:500;color:var(--label2)}
+.teams-button{font-size:11px;line-height:1.4;padding:5px 8px;border-radius:14px;background:var(--label4);color:var(--label2)}
+.teams-button:disabled{opacity:.5;cursor:default}
+.teams-events{display:grid;gap:2px}
+.teams-event{display:grid;grid-template-columns:76px minmax(0,1fr);align-items:center;gap:6px;min-height:20px;padding:2px 0;text-align:left;background:none;color:var(--label)}
+.teams-event-date{font-size:11px;color:var(--label2);white-space:nowrap}
+.teams-event-title{font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.teams-status,.teams-empty{font-size:11px;line-height:1.5;color:var(--label2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.teams-status[hidden]{display:none}
+.teams-explanation{font-size:14px;line-height:1.7;margin:18px 0;color:var(--label2)}
+.teams-account{font-size:13px;color:var(--label2);overflow-wrap:anywhere;margin-top:16px}
+.teams-actions{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0 20px}
+.teams-actions .teams-button{font-size:13px;min-height:40px;padding:8px 14px}
+.teams-month{font-size:16px;margin:16px 0 12px}
+.teams-all-events{list-style:none;margin:0 0 18px}
+.teams-detail-event{padding:14px 0;border-bottom:1px solid var(--label4)}
+.teams-detail-date{font-size:13px;color:var(--label2);margin-bottom:6px}
+.teams-detail-title{font-size:16px;line-height:1.5;overflow-wrap:anywhere}
+@media(orientation:portrait){.info-stack{width:min(90vw,46vh)}}
+@media(orientation:landscape) and (max-height:500px){.teams-event:nth-child(n+2){display:none}.teams-heading{min-height:20px}.teams-heading .teams-button{padding:2px 6px}.teams-event{min-height:18px}}

@@ -8,6 +8,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Nightstand">
 <meta name="theme-color" content="#000000">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://api.open-meteo.com https://www8.cao.go.jp https://holidays-jp.github.io https://login.microsoftonline.com https://graph.microsoft.com; frame-src 'self' https://login.microsoftonline.com; object-src 'none'; base-uri 'none'; form-action 'self' https://login.microsoftonline.com">
 <link rel="apple-touch-icon" id="touchIcon" href="">
 <link rel="icon" id="favicon" href="">
 <title>Nightstand</title>
@@ -49,8 +51,6 @@
 </div>
 <div id="hot" aria-label="表示モード"><div id="modeBtn"><svg id="modeIcon" viewBox="0 0 16 16" aria-hidden="true"></svg><span id="modeLabel"></span></div></div>
 <script src="classic.js"></script>
-<script type="module">
-if (new URLSearchParams(location.search).get("next") === "1") import("./enhancements.js");
-</script>
+<script type="module" src="enhancements-loader.js"></script>
 </body>
 </html>
