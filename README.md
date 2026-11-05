@@ -27,6 +27,33 @@ iPhone の StandBy 風に、アナログ時計・カレンダー（日本の祝�
 
 `index.html` は既存のマークアップとクエリによる読み込みだけを持つ。`classic.css` と `classic.js` は元のスタイルと処理をそのまま切り出したもの。`classic.js` の小さな `NightstandClassic` インターフェースを通じて、月移動・天気のアイコンや表示・位置情報取得を再利用する。
 
-追加機能は `enhancements.js` / `enhancements.css`、天気詳細は `weather-detail.js` / `weather-detail.css`、タイマーは `timer.js` / `timer.css`、週間表示は `week-calendar.js` / `week-calendar.css` に置く。クエリのないクラシックでは、これらを読み込まない。追加機能に対してもクラシックの昼夜の配色を使う。
+`enhancements.js` は機能の読み込みと初期化を行う。機能間の接続はこの入口で行い、追加機能のJavaScriptとCSSには同じ版番号を付ける。
+
+| ファイル | 役割 |
+| --- | --- |
+| `month-calendar.js` | 月表示、日付・祝日の表示、クラシックの更新を受ける処理 |
+| `calendar-gestures.js` | 月移動のスワイプ・ドラッグ・ホイール・キー操作 |
+| `week-calendar.js` / `.css` | 週の選択と週間表示 |
+| `calendar-dates.js` | 月表示と週間表示で共用する日付の計算・表記 |
+| `sheets.js` | ダイアログの開閉、キーボード操作、タッチ操作の共通処理 |
+| `forecast.js` | 天気の取得、キャッシュ、通信失敗と再取得 |
+| `weather-detail.js` / `.css` | 天気詳細の描画 |
+| `timer.js` / `.css` | タイマーの状態・保存・描画 |
+
+DOM監視は月表示側にまとめ、週間表示は月表示の更新通知を受ける。クエリのないクラシックでは、これらの追加機能を読み込まない。昼夜の配色とアナログ時計のデザインはクラシックと共通。
+
+## テスト
+
+配信するアプリにビルド工程やフレームワークは不要。開発用のテストはNode.js 22以上を使用する（検証環境は24）。依存はテスト用のPlaywrightだけ。
+
+```sh
+npm ci
+npx playwright install chromium
+npm test
+```
+
+`npm run test:unit` は日付の計算をNode標準テストで確認する。`npm run test:browser` は主要な操作をChromiumで確認し、確認用サーバーを自動起動・終了する。WebKitも確認する場合は、対応するシステムライブラリを用意して `npx playwright install webkit` と `npm run test:webkit` を実行する。既存のChromeを使う場合は `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` を指定できる。
+
+自動テストの対象は、月・年・うるう日・タイムゾーンの境界、月移動と週の選択の競合、週間表示、日付と祝日、天気の失敗・キャッシュ・再取得、タイマーの復元・終了、スマホ縦横5サイズ。外部APIは固定データに置き換え、実際のMicrosoft認証や端末の通知音・画面ロック中の動作は対象に含めない。WebKitでの確認は実機Safariの確認を代替しない。
 
 予定表のTeams連携は未実装。後続では、認証・予定データを接続したブラウザに限定し、公開ファイルや他端末へ共有しない構成を検討する。
