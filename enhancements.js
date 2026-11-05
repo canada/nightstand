@@ -6,7 +6,7 @@ const {store, icons:ICON, describeWeather:wmo, getPosition:getPos, renderWeather
 // Keep styles and the entry module on the same release when browser caches are warm.
 const assetURL=file=>{const url=new URL(file,import.meta.url);url.search=new URL(import.meta.url).search;return url;};
 const style = document.createElement('link');style.rel='stylesheet';style.href=assetURL('enhancements.css');document.head.append(style);
-for(const file of ['weather-detail.css','timer.css']){const link=document.createElement('link');link.rel='stylesheet';link.href=assetURL(file);document.head.append(link);}
+for(const file of ['weather-detail.css','timer.css','week-calendar.css']){const link=document.createElement('link');link.rel='stylesheet';link.href=assetURL(file);document.head.append(link);}
 const year=document.createElement('span');year.id='todayYear';
 const dateBody=document.createElement('div');dateBody.append($('wday'),$('mday'));$('date').append(year,dateBody);
 const grid=$('grid');
@@ -138,19 +138,20 @@ function finishSwipe(commit){
 // Both touch swipes and mouse drags move the calendar continuously.
 info.addEventListener('pointerdown',e=>{
   if(!e.isPrimary){if(swipe)finishSwipe(false);return;}
-  if(settling || e.button!==0 || e.target.closest('button,#wx'))return;
+  if(settling || e.button!==0 || e.target.closest('button:not(.calendar-week-button),#wx'))return;
   if(swipe?.id==='wheel')resetSwipe();
   swipe={id:e.pointerId,x:e.clientX,y:e.clientY,dy:0,offset:classic.getMonthOffset(),
     height:grid.clientHeight,started:false,time:performance.now()};
-  info.setPointerCapture(e.pointerId);
+  // Leave taps on a week button alone; capture only after its drag starts.
+  if(!e.target.closest('.calendar-week-button'))info.setPointerCapture(e.pointerId);
 });
 info.addEventListener('pointermove',e=>{
   if(!swipe || swipe.id!==e.pointerId)return;
   const dx=e.clientX-swipe.x,dy=e.clientY-swipe.y;
   if(!swipe.started){
     if(Math.max(Math.abs(dx),Math.abs(dy))<6)return;
-    if(Math.abs(dx)>Math.abs(dy)){swipe=null;return;}
-    swipe.started=true;makePreviews(swipe.offset);viewport.classList.add('dragging');
+    if(Math.abs(dx)>Math.abs(dy)){info.setPointerCapture(e.pointerId);swipe=null;return;}
+    swipe.started=true;info.setPointerCapture(e.pointerId);makePreviews(swipe.offset);viewport.classList.add('dragging');
   }
   swipe.dy=Math.max(-swipe.height,Math.min(swipe.height,dy));
   movePages(swipe.dy);
@@ -165,8 +166,9 @@ info.addEventListener('pointerup',e=>{
 });
 info.addEventListener('pointercancel',()=>finishSwipe(false));
 info.addEventListener('lostpointercapture',()=>{if(swipe)finishSwipe(false);});
+addEventListener('pointerup',e=>{if(swipe&&!swipe.started&&!info.contains(e.target))swipe=null;});
 info.addEventListener('wheel',e=>{
-  if(e.ctrlKey || Math.abs(e.deltaX)>Math.abs(e.deltaY) || !e.deltaY || e.target.closest('button,#wx'))return;
+  if(e.ctrlKey || Math.abs(e.deltaX)>Math.abs(e.deltaY) || !e.deltaY || e.target.closest('button:not(.calendar-week-button),#wx'))return;
   e.preventDefault();
   if(settling || (swipe && swipe.id!=='wheel'))return;
   if(!swipe){
@@ -247,4 +249,7 @@ async function loadWeather(force=false) {
   }).finally(()=>{weatherPromise=null;});
   return weatherPromise;
 }
+
+const {initWeekCalendar}=await import(assetURL('week-calendar.js'));
+initWeekCalendar({classic,grid,viewport,canOpen:()=>!swipe&&!settling});
 
