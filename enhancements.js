@@ -26,19 +26,85 @@ function updateCalendar(){
 new MutationObserver(updateCalendar).observe($('grid'),{childList:true});updateCalendar();
 function changeMonth(delta){classic.setMonthOffset(classic.getMonthOffset()+delta);lockScreen();}
 $('currentMonth').addEventListener('click',()=>classic.setMonthOffset(0));
-let swipe=null;
 const info=$('info');
-// Pointer events cover both touch swipes and dragging with a mouse.
+const grid=$('grid');
+const viewport=document.createElement('div');viewport.className='calendar-viewport';
+grid.before(viewport);viewport.append(grid);
+let swipe=null, settling=false, settleTimer=null;
+let previews=[];
+const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
+function resetSwipe(){
+  clearTimeout(settleTimer);settleTimer=null;
+  swipe=null;settling=false;
+  for(const preview of previews)preview.remove();
+  previews=[];
+  grid.style.removeProperty('transform');grid.style.removeProperty('transition');
+  viewport.classList.remove('dragging');
+}
+function makePreviews(offset){
+  try{
+    for(const delta of [-1,1]){
+      classic.setMonthOffset(offset+delta);
+      const preview=grid.cloneNode(true);
+      preview.removeAttribute('id');preview.removeAttribute('aria-label');
+      preview.className='calendar-preview';preview.setAttribute('aria-hidden','true');
+      preview.dataset.side=delta;
+      previews.push(preview);
+    }
+  }finally{classic.setMonthOffset(offset);}
+  viewport.append(...previews);
+}
+function movePages(dx,width,transition='none'){
+  grid.style.transition=transition;grid.style.transform=`translate3d(${dx}px,0,0)`;
+  for(const preview of previews){
+    preview.style.transition=transition;
+    preview.style.transform=`translate3d(${Number(preview.dataset.side)*width+dx}px,0,0)`;
+  }
+}
+function finishSwipe(commit){
+  const gesture=swipe;swipe=null;
+  if(!gesture?.started)return;
+  settling=true;
+  const direction=gesture.dx<0?1:-1;
+  const duration=reducedMotion.matches?0:180;
+  movePages(commit?-direction*gesture.width:0,gesture.width,`transform ${duration}ms cubic-bezier(.2,.8,.2,1)`);
+  settleTimer=setTimeout(()=>{
+    // A keyboard or Today action during the animation takes precedence.
+    if(commit && classic.getMonthOffset()===gesture.offset)changeMonth(direction);
+    resetSwipe();
+  },duration);
+}
+// Both touch swipes and mouse drags move the calendar continuously.
 info.addEventListener('pointerdown',e=>{
-  if(!e.isPrimary || e.button!==0 || e.target.closest('button,#wx'))return;
-  swipe={id:e.pointerId,x:e.clientX,y:e.clientY};info.setPointerCapture(e.pointerId);
+  if(!e.isPrimary){if(swipe)finishSwipe(false);return;}
+  if(settling || e.button!==0 || e.target.closest('button,#wx'))return;
+  swipe={id:e.pointerId,x:e.clientX,y:e.clientY,dx:0,offset:classic.getMonthOffset(),
+    width:viewport.clientWidth,started:false,time:performance.now()};
+  info.setPointerCapture(e.pointerId);
+});
+info.addEventListener('pointermove',e=>{
+  if(!swipe || swipe.id!==e.pointerId)return;
+  const dx=e.clientX-swipe.x,dy=e.clientY-swipe.y;
+  if(!swipe.started){
+    if(Math.max(Math.abs(dx),Math.abs(dy))<6)return;
+    if(Math.abs(dy)>Math.abs(dx)){swipe=null;return;}
+    swipe.started=true;makePreviews(swipe.offset);viewport.classList.add('dragging');
+  }
+  swipe.dx=Math.max(-swipe.width,Math.min(swipe.width,dx));
+  movePages(swipe.dx,swipe.width);
 });
 info.addEventListener('pointerup',e=>{
   if(!swipe || swipe.id!==e.pointerId)return;
-  const dx=e.clientX-swipe.x,dy=e.clientY-swipe.y;swipe=null;
-  if(Math.abs(dx)>40 && Math.abs(dx)>Math.abs(dy))changeMonth(dx<0?1:-1);
+  if(!swipe.started){swipe=null;return;}
+  swipe.dx=Math.max(-swipe.width,Math.min(swipe.width,e.clientX-swipe.x));
+  const distance=Math.abs(swipe.dx),elapsed=Math.max(1,performance.now()-swipe.time);
+  const threshold=Math.max(30,Math.min(80,swipe.width*.18));
+  finishSwipe(distance>=threshold || (distance>=25 && distance/elapsed>.5));
 });
-info.addEventListener('pointercancel',()=>{swipe=null;});
+info.addEventListener('pointercancel',()=>finishSwipe(false));
+info.addEventListener('lostpointercapture',()=>{if(swipe)finishSwipe(false);});
+addEventListener('resize',resetSwipe);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)resetSwipe();});
 // Prevent the classic swipe listener from handling the same gesture twice.
 for(const event of ['touchstart','touchend','touchcancel'])info.addEventListener(event,e=>e.stopPropagation(),{passive:true});
 const classicLink=document.createElement('a');classicLink.id='classicLink';classicLink.textContent='クラシック';const classicURL=new URL(location.href);classicURL.searchParams.delete('next');classicLink.href=classicURL.href;document.body.append(classicLink);
