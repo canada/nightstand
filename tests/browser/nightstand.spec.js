@@ -38,6 +38,8 @@ async function exerciseBasicFeatures(page) {
   await expect(page.locator('#mday')).toHaveText('12月');
   await page.getByRole('button', { name: '時計・タイマーを開く' }).click();
   await page.getByRole('button', { name: '1分のタイマーを開始', exact: true }).click();
+  await expect(page.locator('#timerDialog')).not.toBeVisible();
+  await page.locator('#timerBadge').click();
   await expect(page.getByRole('button', { name: '一時停止', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'キャンセル', exact: true }).click();
   await page.keyboard.press('Escape');
@@ -238,6 +240,8 @@ test('a custom timer survives reload, pauses, resumes, finishes and clears its b
   await page.getByRole('spinbutton', { name: 'タイマーの分' }).fill('0');
   await page.getByRole('spinbutton', { name: 'タイマーの秒' }).fill('5');
   await page.getByRole('button', { name: '開始', exact: true }).click();
+  await expect(page.locator('#timerDialog')).not.toBeVisible();
+  await page.locator('#timerBadge').click();
   await page.getByRole('button', { name: '一時停止', exact: true }).click();
   await page.reload();
   await expect(page.locator('#timerBadge')).toHaveClass(/paused/);
@@ -245,9 +249,12 @@ test('a custom timer survives reload, pauses, resumes, finishes and clears its b
   await page.getByRole('button', { name: '再開', exact: true }).click();
   await page.clock.fastForward(6000);
   await expect(page.locator('#timerState')).toHaveText('終了');
-  await expect(page.locator('#timerBadge')).toHaveText('00:00');
-  await page.clock.fastForward(31000);
+  await expect(page.locator('#timerBadgeRemaining')).toHaveText('00:00');
+  await expect(page.locator('#timerBadgeDuration')).toHaveText('5秒');
+  await page.clock.fastForward(10000);
   await expect(page.locator('#timerBadge')).not.toBeVisible();
+  await expect(page.locator('#timerPresets')).toBeVisible();
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('nsTimerV1')).status)).toBe('idle');
 });
 
 test('a running timer restores its deadline after reload', async ({ page }) => {
@@ -256,7 +263,7 @@ test('a running timer restores its deadline after reload', async ({ page }) => {
   await page.getByRole('button', { name: '1分のタイマーを開始', exact: true }).click();
   await page.clock.fastForward(20000);
   await page.reload();
-  await expect(page.locator('#timerBadge')).toHaveText(/^00:(39|40)$/);
+  await expect(page.locator('#timerBadgeRemaining')).toHaveText(/^00:(39|40)$/);
 });
 
 test('zero-length timers remain unstarted and show a validation message', async ({ page }) => {
@@ -337,5 +344,137 @@ for (const [width, height] of [
     const columns = await page.locator('.week-column-title').all();
     expect(columns).toHaveLength(7);
     await expect(page.getByRole('button', { name: '閉じる', exact: true })).toBeInViewport();
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: '時計・タイマーを開く' }).click();
+    await expect(page.getByRole('button', { name: '開始', exact: true })).toBeInViewport({ ratio: 1 });
+    await expect(page.getByRole('button', { name: '音を試す', exact: true })).toBeInViewport({ ratio: 1 });
   });
 }
+
+test('quick timers use one row, default custom time is ten minutes and start returns to the clock', async ({ page }) => {
+  await openApp(page);
+  await page.getByRole('button', { name: '時計・タイマーを開く' }).click();
+  await expect(page.locator('.timer-preset')).toHaveCount(3);
+  await expect(page.locator('.timer-preset')).toHaveText(['1分', '3分', '5分']);
+  await expect(page.locator('#timerMinutes')).toHaveValue('10');
+  await expect(page.locator('#timerSeconds')).toHaveValue('0');
+  await page.getByRole('button', { name: '開始', exact: true }).click();
+  await expect(page.locator('#timerDialog')).not.toBeVisible();
+  await expect(page.locator('#timerBadgeDuration')).toHaveText('10分');
+  await expect(page.getByRole('button', { name: '時計・タイマーを開く' })).toBeFocused();
+  await page.locator('#timerBadge').click();
+  await expect(page.getByRole('button', { name: '一時停止', exact: true })).toBeVisible();
+});
+
+test('a finished timer dismisses with one click and does not reopen its controls', async ({ page }) => {
+  await openApp(page);
+  await page.getByRole('button', { name: '時計・タイマーを開く' }).click();
+  await page.getByRole('button', { name: '1分のタイマーを開始', exact: true }).click();
+  await page.clock.fastForward(60000);
+  await expect(page.locator('#timerBadge')).toHaveClass(/finished/);
+  await expect(page.locator('#timerBadgeDuration')).toHaveText('1分');
+  await page.locator('#timerBadge').click();
+  await expect(page.locator('#timerBadge')).not.toBeVisible();
+  await expect(page.locator('#timerDialog')).not.toBeVisible();
+  await page.reload();
+  await page.getByRole('button', { name: '時計・タイマーを開く' }).click();
+  await expect(page.locator('#timerPresets')).toBeVisible();
+});
+
+test('a finished timer expires even when the page reloads much later', async ({ page }) => {
+  await openApp(page);
+  await page.getByRole('button', { name: '時計・タイマーを開く' }).click();
+  await page.getByRole('button', { name: '1分のタイマーを開始', exact: true }).click();
+  await page.clock.fastForward(80000);
+  await page.reload();
+  await expect(page.locator('#timerBadge')).not.toBeVisible();
+  await page.getByRole('button', { name: '時計・タイマーを開く' }).click();
+  await expect(page.locator('#timerPresets')).toBeVisible();
+});
+
+async function mockAudio(page, rejectResume = false) {
+  await page.addInitScript(({ rejectResume }) => {
+    window.audioProbe = { resumes: 0, starts: 0, stops: 0, rejectResume };
+    window.AudioContext = class {
+      constructor() { this.state = 'running'; this.currentTime = 0; window.testAudio = this; }
+      async resume() {
+        window.audioProbe.resumes++;
+        if (window.audioProbe.rejectResume) throw new Error('Audio unavailable');
+        this.state = 'running';
+      }
+      createOscillator() {
+        return {
+          frequency: {}, connect() {}, disconnect() {},
+          start() { window.audioProbe.starts++; },
+          stop() { window.audioProbe.stops++; }
+        };
+      }
+      createGain() {
+        return { gain: { setValueAtTime() {}, linearRampToValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {}, disconnect() {} };
+      }
+    };
+  }, { rejectResume });
+}
+
+test('the sound check plays and the alarm resumes suspended audio before scheduling its tones', async ({ page }) => {
+  await mockAudio(page);
+  await openApp(page);
+  await page.getByRole('button', { name: '時計・タイマーを開く' }).click();
+  await page.getByRole('button', { name: '音を試す', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.audioProbe.starts)).toBe(3);
+  await page.getByRole('button', { name: '1分のタイマーを開始', exact: true }).click();
+  await page.evaluate(() => { window.testAudio.state = 'suspended'; });
+  await page.clock.fastForward(60000);
+  await expect.poll(() => page.evaluate(() => window.audioProbe.resumes)).toBe(1);
+  await expect.poll(() => page.evaluate(() => window.audioProbe.starts)).toBe(6);
+});
+
+test('a rejected sound resume is explained and can be retried without breaking the timer', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await mockAudio(page, true);
+  await openApp(page);
+  await page.getByRole('button', { name: '時計・タイマーを開く' }).click();
+  await page.evaluate(() => { window.testAudio.state = 'suspended'; });
+  await page.getByRole('button', { name: '音を試す', exact: true }).click();
+  await expect(page.locator('#timerSoundStatus')).toContainText('音を再生できませんでした');
+  await page.evaluate(() => { window.audioProbe.rejectResume = false; });
+  await page.getByRole('button', { name: '音を試す', exact: true }).click();
+  await expect(page.locator('#timerSoundStatus')).toContainText('確認音を再生しました');
+  await expect.poll(() => page.evaluate(() => window.audioProbe.starts)).toBe(3);
+  await page.getByRole('button', { name: '3分のタイマーを開始', exact: true }).click();
+  await expect(page.locator('#timerBadgeDuration')).toHaveText('3分');
+  expect(errors).toEqual([]);
+});
+
+test('month headings stay in place through rapid changes and reduced motion skips the turn', async ({ page }) => {
+  await openApp(page);
+  const rect = await page.locator('#mday').boundingBox();
+  await goNext(page);
+  await goNext(page);
+  await expect(page.locator('#todayYear')).toHaveText('2027年');
+  await expect(page.locator('#mday')).toHaveText('1月');
+  const moved = await page.locator('#mday').boundingBox();
+  expect(moved.x).toBeCloseTo(rect.x, 0);
+  expect(moved.y).toBeCloseTo(rect.y, 0);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.getByRole('button', { name: '今日のカレンダーに戻る' }).click();
+  await expect(page.locator('#mday')).toHaveText('11月');
+  await expect(page.locator('.calendar-roll-outgoing')).toHaveCount(0);
+  expect(await page.locator('#date').evaluate(node => node.getAnimations({ subtree: true }).length)).toBe(0);
+});
+
+
+test('a browser that leaves audio resume pending offers a manual retry instead of silent failure', async ({ page }) => {
+  await mockAudio(page);
+  await openApp(page);
+  await page.getByRole('button', { name: '時計・タイマーを開く' }).click();
+  await page.evaluate(() => {
+    window.testAudio.state = 'suspended';
+    window.testAudio.resume = () => new Promise(() => {});
+  });
+  await page.getByRole('button', { name: '音を試す', exact: true }).click();
+  await page.clock.fastForward(1600);
+  await expect(page.locator('#timerSoundStatus')).toContainText('音を再生できませんでした');
+  await expect.poll(() => page.evaluate(() => window.audioProbe.starts)).toBe(0);
+});
