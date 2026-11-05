@@ -9,11 +9,9 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(-
 #mday{font-size:8.7cqh}
 #wx{background:none;padding:0;touch-action:manipulation;opacity:1}
 #wx:not(.on) #wxSub{font-size:3.4cqh}
-#calControls{display:flex;flex:none;align-items:center;justify-content:space-between;min-height:44px;padding:0 2.6cqw 1cqh;gap:1cqw}
+#calControls{display:flex;flex:none;align-items:center;padding:0}
 #calControls[hidden]{display:none}
-#calPeriod{display:flex;align-items:baseline;justify-content:center;gap:1cqw;min-width:0}
-#selectedMonth{color:var(--label);font-size:4.6cqh}
-#selectedYear{font-size:4.6cqh;color:var(--label2)}
+#foot[hidden]{display:none}
 #currentMonth{display:grid;place-items:center;color:var(--label2);width:44px;height:44px;padding:10px;border-radius:50%;background:none;flex:none}
 #currentMonth svg{width:21px;height:21px}
 #currentMonth:hover{background:var(--label4)}

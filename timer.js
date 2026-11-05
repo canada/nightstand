@@ -67,9 +67,10 @@
     $('timerCancel').textContent=done?'完了':'キャンセル';
     const finishedAt=Number.isFinite(timer.finishedAt)?timer.finishedAt:0;
     const badge=$('timerBadge');badge.hidden=idle || (done && Date.now()-finishedAt>=FINISHED_BADGE_MS);
-    badge.textContent=done?'タイマー終了':`${timer.status==='paused'?'一時停止 · ':''}${format(ms)}`;
-    badge.setAttribute('aria-label',done?'タイマー終了。開く':`残り${format(ms)}。タイマーを開く`);
+    badge.textContent=format(ms);
+    badge.setAttribute('aria-label',done?'タイマー終了。開く':`${timer.status==='paused'?'一時停止中。':''}残り${format(ms)}。タイマーを開く`);
     badge.classList.toggle('finished',done);
+    badge.classList.toggle('paused',timer.status==='paused');
     $('timerActive').classList.toggle('finished',done);
   }
   function start(duration) {
