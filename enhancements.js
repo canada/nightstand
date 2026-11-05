@@ -8,7 +8,7 @@ for(const file of ['weather-detail.css','timer.css']){const link=document.create
 const year=document.createElement('span');year.id='todayYear';
 const dateBody=document.createElement('div');dateBody.append($('wday'),$('mday'));$('date').append(year,dateBody);
 const controls=document.createElement('nav');controls.id='calControls';controls.setAttribute('aria-label','カレンダーの月移動');
-controls.innerHTML=`<div id="calPeriod" aria-live="polite" aria-atomic="true"><span id="selectedYear"></span><span id="selectedMonth"></span></div><button id="currentMonth" type="button" aria-label="今日のカレンダーに戻る" title="今日に戻る"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 3v4m8-4v4M4 10h16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><text id="todayNumber" x="12" y="18.5" text-anchor="middle" fill="currentColor" font-size="8" font-weight="600"></text></svg></button>`;
+controls.innerHTML=`<div id="calPeriod" aria-live="polite" aria-atomic="true"><span id="selectedYear"></span><span id="selectedMonth"></span></div><button id="currentMonth" type="button" aria-label="今日のカレンダーに戻る" title="今日に戻る"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8M3 3v5h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`;
 $('grid').before(controls);
 function updateCalendar(){
   const now=new Date(), offset=classic.getMonthOffset();
@@ -16,7 +16,6 @@ function updateCalendar(){
   year.textContent=`${now.getFullYear()}年`;
   $('selectedYear').textContent=`${shown.getFullYear()}年`;
   $('selectedMonth').textContent=`${shown.getMonth()+1}月`;
-  $('todayNumber').textContent=now.getDate();
   controls.hidden=offset===0;
   $('currentMonth').disabled=offset===0;
   $('grid').setAttribute('aria-label',`${shown.getFullYear()}年${shown.getMonth()+1}月のカレンダー`);
