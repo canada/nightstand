@@ -14,8 +14,20 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(-
 #foot[hidden]{display:none}
 #currentMonth{display:grid;place-items:center;color:var(--label2);width:44px;height:44px;padding:10px;border-radius:50%;background:none;flex:none}
 #currentMonth svg{width:21px;height:21px}
-#currentMonth:hover{background:var(--label4)}
+@media(hover:hover){#currentMonth:hover{background:var(--label4)}}
+@media(max-width:900px),(pointer:coarse){#currentMonth svg{width:clamp(12px,4.6cqh,16px);height:clamp(12px,4.6cqh,16px)}}
 #currentMonth:disabled{visibility:hidden;pointer-events:none}
+.calendar-viewport{position:relative;flex:1;min-height:0;display:flex;overflow:hidden;padding-bottom:2cqh;margin-bottom:-2cqh}
+.calendar-viewport.dragging{cursor:grabbing}
+.calendar-viewport.dragging #grid,.calendar-preview{will-change:transform}
+.calendar-preview{position:absolute;inset:0 0 2cqh;display:grid;grid-template-columns:repeat(7,1fr);grid-template-rows:auto;grid-auto-rows:minmax(0,1fr);align-items:center;justify-items:center;pointer-events:none}
+.calendar-preview .wd{font-size:3.4cqh;font-weight:600;color:var(--label3);padding-bottom:.6cqh}
+.calendar-preview .d{position:relative;height:min(8cqh,100%);aspect-ratio:1;display:grid;place-items:center;border-radius:50%;font-size:4.9cqh;font-weight:500;color:var(--label);letter-spacing:-.01em}
+.calendar-preview .we,.calendar-preview .hol{color:var(--label2)}
+.calendar-preview .hol::after{content:"";position:absolute;bottom:-.2cqh;width:.95cqh;height:.95cqh;border-radius:50%;background:var(--red)}
+.calendar-preview .today{background:var(--red);color:var(--onRed);font-weight:700}
+.calendar-preview .today.hol::after{bottom:-1.9cqh}
+.calendar-preview .blank{visibility:hidden}
 #classicLink{position:fixed;bottom:max(8px,env(safe-area-inset-bottom));left:max(12px,env(safe-area-inset-left));color:var(--label3);font-size:11px;text-decoration:none;padding:6px;z-index:2}
 .sheet{margin:auto;width:min(680px,calc(100% - 24px));max-height:calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));padding:24px;border:1px solid var(--label4);border-radius:28px;background:var(--face);color:var(--label);overflow:auto;overscroll-behavior:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch;color-scheme:dark}
 .sheet::backdrop{background:rgba(0,0,0,.78);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
