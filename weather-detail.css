@@ -1,0 +1,28 @@
+.forecast-current{display:flex;align-items:center;justify-content:space-between;padding:0 8px 20px;gap:20px}
+.forecast-current svg{width:92px;height:92px}
+.forecast-caption{font-size:12px;color:var(--label2);font-weight:500}
+.forecast-temperature{font-size:72px;font-weight:300;letter-spacing:-.06em;line-height:1.15}
+.forecast-description{font-size:16px;color:var(--label2);margin-top:4px}
+.forecast-facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;border-radius:18px;overflow:hidden;background:var(--label4)}
+.forecast-facts>div{padding:14px;background:var(--face)}
+.forecast-facts dt{font-size:11px;color:var(--label2);margin-bottom:6px}
+.forecast-facts dd{font-size:18px;font-weight:500}
+.forecast-section{margin-top:24px}
+.forecast-section h3{font-size:14px;font-weight:600;margin-bottom:14px}
+.forecast-hours{display:flex;gap:10px;overflow-x:auto;padding-bottom:10px;touch-action:pan-x pan-y}
+.forecast-hour{display:flex;flex-direction:column;align-items:center;gap:9px;min-width:60px;padding:10px 5px;border-radius:18px;background:var(--label4)}
+.forecast-hour svg{width:28px;height:28px}
+.forecast-hour strong{font-size:18px;font-weight:500}
+.forecast-rain{font-size:12px;color:var(--rain)}
+.forecast-days{display:grid}
+.forecast-day{display:grid;grid-template-columns:76px 28px minmax(0,1fr) 40px 34px 34px;gap:10px;align-items:center;padding:13px 0;border-top:1px solid var(--label4);font-size:14px}
+.forecast-day svg{width:28px;height:28px}
+.forecast-day-label{font-weight:500}
+.forecast-condition{font-size:12px;color:var(--label2)}
+.forecast-day .forecast-rain,.forecast-low,.forecast-high{text-align:right}
+.forecast-low{color:var(--label2)}
+.forecast-source{margin-top:20px}
+.forecast-source a{color:inherit;text-decoration:underline;text-underline-offset:3px}
+.forecast-notice{padding:12px 14px;margin-bottom:20px;border:1px solid var(--label4);border-radius:16px}
+@media(max-width:430px){.forecast-day{grid-template-columns:68px 26px minmax(0,1fr) 32px 30px 30px;gap:6px}.forecast-condition{font-size:10px}.forecast-facts>div{padding:12px}.forecast-facts dd{font-size:16px}}
+@media(max-height:450px) and (min-width:550px){.forecast-current{float:left;width:42%;padding-right:26px}.forecast-facts{min-height:130px}.forecast-section{clear:both}.forecast-temperature{font-size:66px}.forecast-current svg{width:66px;height:66px}}
