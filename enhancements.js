@@ -3,8 +3,10 @@ import './timer.js';
 const classic = window.NightstandClassic;
 const $ = id => document.getElementById(id);
 const {store, icons:ICON, describeWeather:wmo, getPosition:getPos, renderWeather:renderWx, lockScreen} = classic;
-const style = document.createElement('link');style.rel='stylesheet';style.href=new URL('enhancements.css',import.meta.url);document.head.append(style);
-for(const file of ['weather-detail.css','timer.css']){const link=document.createElement('link');link.rel='stylesheet';link.href=new URL(file,import.meta.url);document.head.append(link);}
+// Keep styles and the entry module on the same release when browser caches are warm.
+const assetURL=file=>{const url=new URL(file,import.meta.url);url.search=new URL(import.meta.url).search;return url;};
+const style = document.createElement('link');style.rel='stylesheet';style.href=assetURL('enhancements.css');document.head.append(style);
+for(const file of ['weather-detail.css','timer.css']){const link=document.createElement('link');link.rel='stylesheet';link.href=assetURL(file);document.head.append(link);}
 const year=document.createElement('span');year.id='todayYear';
 const dateBody=document.createElement('div');dateBody.append($('wday'),$('mday'));$('date').append(year,dateBody);
 const grid=$('grid');
@@ -45,9 +47,23 @@ function updateCalendar(){
   calendarObserver?.disconnect();
   fillMonthEdges(offset);
   year.textContent=`${shown.getFullYear()}年`;
-  $('wday').hidden=true;
+  const weekday=['日','月','火','水','木','金','土'][now.getDay()];
+  $('wday').textContent=`${now.getDate()}日（${weekday}）`;
+  $('wday').hidden=false;
+  $('wday').classList.toggle('calendar-date-muted',offset!==0);
   $('foot').hidden=false;
-  $('foot').classList.toggle('calendar-foot-muted',offset!==0);
+  if(offset!==0){
+    const monthKey=`${shown.getFullYear()}-${String(shown.getMonth()+1).padStart(2,'0')}-`;
+    const holidays=Object.entries(store.get('holidays')?.d || {}).filter(([date])=>date.startsWith(monthKey)).sort(([a],[b])=>a.localeCompare(b));
+    $('foot').replaceChildren();
+    if(holidays.length){
+      const dot=document.createElement('span');dot.className='dot';
+      const names=document.createElement('b');
+      names.textContent=holidays.map(([date,name])=>`${Number(date.slice(-2))}日 ${name}`).join(' · ');
+      names.title=names.textContent;
+      $('foot').append(dot,names);
+    }
+  }
   $('mday').textContent=`${shown.getMonth()+1}月`;
   controls.hidden=false;
   $('currentMonth').disabled=offset===0;
