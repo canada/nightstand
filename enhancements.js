@@ -48,12 +48,13 @@ const timerDialog = ui.createSheet({
   contentId: 'timerContents'
 });
 const clock = document.querySelector('.clockp');
-const badge = ui.element('span');
+const badge = ui.element('button');
+badge.type = 'button';
 badge.id = 'timerBadge';
 badge.hidden = true;
 badge.setAttribute('aria-live', 'off');
 clock.append(badge);
-NightstandTimer.init();
+NightstandTimer.init({ onStart() { timerDialog.close(); $('clock').focus(); } });
 const weather = forecast.initForecast({ classic, details: window.NightstandWeather });
 
 if (!$('wxSub').textContent) $('wxSub').textContent = '天気予報を開く';
@@ -64,10 +65,15 @@ ui.makeTrigger($('wx'), '天気予報の詳細を開く', () => {
   classic.lockScreen();
   weather.load();
 });
-ui.makeTrigger(clock, '時計・タイマーを開く', () => {
+function openTimer() {
   NightstandTimer.open();
   timerDialog.showModal();
   classic.lockScreen();
+}
+ui.makeTrigger($('clock'), '時計・タイマーを開く', openTimer);
+badge.addEventListener('click', () => {
+  if (NightstandTimer.dismissFinished()) $('clock').focus();
+  else openTimer();
 });
 // Weekly view is optional: its loading must not block the basic features.
 import(assetURL('week-calendar.js'))

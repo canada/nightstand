@@ -1,3 +1,48 @@
+// Keep the label in place while its two faces turn vertically.
+function rollingLabel(node) {
+  node.classList.add('calendar-roll');
+  let value = null, face = null, outgoing = null, animations = [];
+  return (nextValue, direction) => {
+    if (nextValue === value) {
+      // Classic rendering can replace the heading while preparing swipe previews.
+      if (!node.contains(face)) node.replaceChildren(face, ...(outgoing ? [outgoing] : []));
+      return;
+    }
+    for (const animation of animations) animation.cancel();
+    outgoing?.remove();
+    const previous = value;
+    value = nextValue;
+    face = document.createElement('span');
+    face.className = 'calendar-roll-face';
+    face.textContent = value;
+    node.replaceChildren(face);
+    outgoing = null;
+    animations = [];
+    if (previous === null || !direction || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const oldFace = document.createElement('span');
+    oldFace.className = 'calendar-roll-outgoing';
+    oldFace.textContent = previous;
+    oldFace.setAttribute('aria-hidden', 'true');
+    node.append(oldFace);
+    outgoing = oldFace;
+    const options = { duration: 240, easing: 'cubic-bezier(.2,.7,.2,1)' };
+    animations = [
+      face.animate([
+        { transform: `translateY(${direction * 65}%) rotateX(${-direction * 75}deg)`, opacity: 0 },
+        { transform: 'translateY(0) rotateX(0)', opacity: 1 }
+      ], options),
+      oldFace.animate([
+        { transform: 'translateY(0) rotateX(0)', opacity: 1 },
+        { transform: `translateY(${-direction * 65}%) rotateX(${direction * 75}deg)`, opacity: 0 }
+      ], options)
+    ];
+    animations[1].finished.then(() => {
+      oldFace.remove();
+      if (outgoing === oldFace) outgoing = null;
+    }).catch(() => {}); // A rapid month change cancels the previous turn.
+  };
+}
+
 export function initMonthCalendar({ classic, dates }) {
   const $ = (id) => document.getElementById(id);
   const { store, lockScreen } = classic;
@@ -19,6 +64,9 @@ export function initMonthCalendar({ classic, dates }) {
   $('date').append(controls);
   $('date').setAttribute('aria-live', 'polite');
   $('date').setAttribute('aria-atomic', 'true');
+  const setYear = rollingLabel(year);
+  const setMonth = rollingLabel($('mday'));
+  let previousMonth = null;
   let calendarObserver;
   function fillMonthEdges(offset, target = grid) {
     // A fresh classic render contains weekday labels; decorated grids do not.
@@ -60,7 +108,10 @@ export function initMonthCalendar({ classic, dates }) {
     const shown = dates.monthAtOffset(offset, now);
     calendarObserver?.disconnect();
     fillMonthEdges(offset);
-    year.textContent = `${shown.getFullYear()}年`;
+    const monthIndex = shown.getFullYear() * 12 + shown.getMonth();
+    const direction = previousMonth === null ? 0 : Math.sign(monthIndex - previousMonth);
+    previousMonth = monthIndex;
+    setYear(`${shown.getFullYear()}年`, direction);
     const weekday = dates.weekdays[now.getDay()];
     $('wday').textContent = `${now.getDate()}日（${weekday}）`;
     $('wday').hidden = false;
@@ -83,7 +134,7 @@ export function initMonthCalendar({ classic, dates }) {
         $('foot').append(dot, names);
       }
     }
-    $('mday').textContent = `${shown.getMonth() + 1}月`;
+    setMonth(`${shown.getMonth() + 1}月`, direction);
     controls.hidden = false;
     $('currentMonth').disabled = offset === 0;
     grid.setAttribute(

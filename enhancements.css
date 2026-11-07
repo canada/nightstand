@@ -8,6 +8,11 @@ html.night #info{--calendar-sunday:var(--label);--calendar-saturday:var(--label2
 #date{display:flex;align-items:flex-end;gap:1.4cqw}
 #todayYear{font-size:6cqh;font-weight:600;color:var(--label2);line-height:1.35}
 #mday{font-size:9.6cqh;min-width:2.4em}
+.calendar-roll{position:relative;overflow:hidden;perspective:160px}
+#todayYear.calendar-roll{display:block;height:1.35em}
+#mday.calendar-roll{height:1.08em}
+.calendar-roll-face{display:block;backface-visibility:hidden}
+.calendar-roll-outgoing{position:absolute;inset:0;backface-visibility:hidden;pointer-events:none}
 #wday{font-size:4.4cqh}
 #wday.calendar-date-muted{visibility:hidden}
 #wx{display:flex;flex-direction:column;align-items:flex-end;justify-content:center;min-width:44px;min-height:44px;background:none;padding:0;touch-action:manipulation;cursor:pointer;opacity:1}
@@ -62,6 +67,6 @@ html.night #info{--calendar-sunday:var(--label);--calendar-saturday:var(--label2
 @media (max-height:450px){.sheet{padding:18px 24px}.sheet-header{margin-bottom:14px}.sheet-header h2{font-size:22px}}
 @media (prefers-reduced-motion:reduce){#stage{transition:none}#modeBtn{transition:none}}
 
-.clockp{cursor:pointer}.clockp:focus-visible,#wx:focus-visible{outline:2px solid var(--orange);outline-offset:5px} #calhead{display:none!important}
+#clock[role=button]{cursor:pointer;outline:none;border-radius:50%}#clock:focus-visible,#wx:focus-visible{outline:2px solid var(--orange);outline-offset:5px} #calhead{display:none!important}
 #hot{width:54px;height:40px;padding:8px 8px 0 0}
 #hot.show{width:150px;height:60px}
