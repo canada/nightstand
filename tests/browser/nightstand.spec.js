@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { forecast, holidays } from '../support/forecast.js';
 
 const now = new Date('2026-11-05T12:00:00+09:00');
-const url = '/?next=1&lat=35.68&lon=139.76';
+const url = '/?lat=35.68&lon=139.76';
 test.beforeEach(async ({ page }) => {
   await page.clock.install({ time: now });
   await page.route('https://www8.cao.go.jp/**', (route) =>
@@ -117,7 +117,7 @@ test('an old unversioned module cannot replace the current release', async ({ pa
 test('classic loads independently without enhancement resources', async ({ page }) => {
   const resources = [];
   page.on('request', (request) => resources.push(request.url()));
-  await page.goto('/?lat=35.68&lon=139.76');
+  await page.goto('/classic.html?lat=35.68&lon=139.76');
   await expect(page.locator('#mday')).toHaveText('11月5日');
   await expect(page.locator('#clock .num')).toHaveCount(12);
   expect(resources.some((url) => /enhancements|week-calendar|timer\.js/.test(url))).toBe(false);
@@ -477,4 +477,26 @@ test('a browser that leaves audio resume pending offers a manual retry instead o
   await page.clock.fastForward(1600);
   await expect(page.locator('#timerSoundStatus')).toContainText('音を再生できませんでした');
   await expect.poll(() => page.evaluate(() => window.audioProbe.starts)).toBe(0);
+});
+
+test('the root URL opens the rich view without a feature query', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: /週を開く/ })).toHaveCount(6);
+  await expect(page.getByRole('button', { name: '時計・タイマーを開く' })).toBeVisible();
+  await expect(page.locator('#googleCalendarSettings')).toBeAttached();
+  expect(new URL(page.url()).searchParams.has('next')).toBe(false);
+});
+
+test('legacy rich links still open and the classic link preserves location without the old flag', async ({ page }) => {
+  await page.goto('/?next=1&lat=35.68&lon=139.76');
+  await expect(page.getByRole('button', { name: /週を開く/ })).toHaveCount(6);
+  await page.locator('#classicLink').click();
+  const target = new URL(page.url());
+  expect(target.pathname).toBe('/classic.html');
+  expect(target.searchParams.get('lat')).toBe('35.68');
+  expect(target.searchParams.get('lon')).toBe('139.76');
+  expect(target.searchParams.has('next')).toBe(false);
+  await expect(page.locator('#mday')).toHaveText('11月5日');
+  await expect(page.locator('#weekDialog')).toHaveCount(0);
+  await expect(page.locator('#timerDialog')).toHaveCount(0);
 });

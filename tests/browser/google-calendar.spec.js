@@ -3,7 +3,7 @@ import { forecast, holidays } from '../support/forecast.js';
 const clientId = '1234567890-nightstandtest.apps.googleusercontent.com';
 const scope = 'https://www.googleapis.com/auth/calendar.events.readonly https://www.googleapis.com/auth/calendar.calendarlist.readonly';
 const api = 'https://www.googleapis.com/calendar/v3/calendars/primary/events**';
-const url = '/?next=1&lat=35.68&lon=139.76';
+const url = '/?lat=35.68&lon=139.76';
 const items = [
   { id: 'a', summary: '会議A', start: { dateTime: '2026-11-05T10:00:00+09:00' }, end: { dateTime: '2026-11-05T11:00:00+09:00' } },
   { id: 'b', summary: '<img src=x onerror=alert(1)>', start: { dateTime: '2026-11-05T10:30:00+09:00' }, end: { dateTime: '2026-11-05T11:30:00+09:00' } },
