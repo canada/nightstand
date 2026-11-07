@@ -24,7 +24,7 @@ async function details(page) {
   await expect(page.locator('.forecast-day')).toHaveCount(7);
 }
 
-test('JMA observations and forecasts take precedence on the clock screen and details identify every provider', async ({ page }) => {
+test('JMA observations and forecasts take precedence on the clock screen and source attribution stays in the footer', async ({ page }) => {
   let modelReads = 0;
   await page.route(modelURL, route => { modelReads++; return route.fulfill({ json: forecast }); });
   await ready(page);
@@ -32,15 +32,16 @@ test('JMA observations and forecasts take precedence on the clock screen and det
   await expect(page.locator('#wxSub2')).toHaveText('最高21° 最低10°');
   await details(page);
   await expect(page.locator('.forecast-description')).toContainText('今日の予報：晴れ');
-  await expect(page.locator('.forecast-section-source').filter({ hasText: '東京地方' })).toBeVisible();
+  await expect(page.locator('.forecast-region').filter({ hasText: '東京地方' })).toBeVisible();
   await expect(page.getByText('東京観測所', { exact: false })).toBeVisible();
   await expect(page.locator('.forecast-facts')).toContainText('58%');
-  await expect(page.locator('.forecast-facts')).toContainText('気象庁');
+  await expect(page.locator('.forecast-facts')).not.toContainText(/気象庁|Open-Meteo/);
+  await expect(page.locator('.forecast-section').filter({ hasText: /気象庁|Open-Meteo/ })).toHaveCount(0);
   await expect(page.locator('.forecast-source')).toContainText('出典：気象庁');
   await expect(page.locator('.forecast-source')).toContainText('加工して表示');
   await expect(page.locator('.forecast-source')).toContainText('Open-Meteo');
   await expect(page.locator('.forecast-hour')).toHaveCount(12);
-  await expect(page.locator('.forecast-day').first()).toHaveAttribute('title', /最低気温：Open-Meteo/);
+  await expect(page.locator('.forecast-day').first()).not.toHaveAttribute('title', /気象庁|Open-Meteo/);
   expect(modelReads).toBe(1); // The classic loader must not race and overwrite JMA.
 });
 
@@ -51,7 +52,7 @@ test('JMA remains usable when supplemental weather is unavailable and missing nu
   await details(page);
   await expect(page.locator('.forecast-day').first().locator('.forecast-low')).toHaveText('—');
   await expect(page.locator('.forecast-hour')).toHaveCount(0);
-  await expect(page.locator('.forecast-provider-note')).toContainText('気象庁で取得できる情報だけ');
+  await expect(page.locator('.forecast-provider-note')).toContainText('一部の情報を取得できなかった');
 });
 
 test('JMA failure falls back explicitly to Open-Meteo and can recover', async ({ page }) => {
@@ -60,7 +61,7 @@ test('JMA failure falls back explicitly to Open-Meteo and can recover', async ({
   await page.goto(url);
   await expect(page.locator('#wxTemp')).toHaveText('19°');
   await details(page);
-  await expect(page.locator('.forecast-provider-note')).toContainText('気象庁の情報を取得できなかった');
+  await expect(page.locator('.forecast-provider-note')).toContainText('一部の情報を取得できなかった');
   await page.unroute(jmaURL, blocked);
   await page.keyboard.press('Escape');
   await page.clock.fastForward(16 * 60000);
@@ -74,7 +75,7 @@ test('good JMA observations remain in use when only its forecast fails', async (
   await ready(page);
   await expect(page.locator('#wxSub2')).toHaveText('最高20° 最低10°');
   await details(page);
-  await expect(page.locator('.forecast-provider-note')).toContainText('観測値は気象庁');
+  await expect(page.locator('.forecast-provider-note')).toContainText('一部の情報を取得できなかった');
 });
 
 test('missing-quality observations use model values without replacing valid JMA forecasts', async ({ page }) => {
@@ -83,7 +84,7 @@ test('missing-quality observations use model values without replacing valid JMA 
   await expect(page.locator('#wxTemp')).toHaveText('19°');
   await expect(page.locator('#wxSub2')).toHaveText('最高21° 最低10°');
   await details(page);
-  await expect(page.getByText('現在値：Open-Meteo', { exact: true })).toBeVisible();
+  await expect(page.locator('.forecast-current')).not.toContainText('Open-Meteo');
 });
 
 test('overseas locations do not request unrelated Japanese regional forecasts', async ({ page }) => {

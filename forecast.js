@@ -84,7 +84,7 @@ export function initForecast({ classic, details, loadJma }) {
       document.getElementById('wxSub').textContent = c.description + (Number.isFinite(pop) && pop >= 20 ? ` · 降水${pop}%` : '');
     }
     document.getElementById('wx').title = forecast.jma
-      ? `${forecast.jma.region} · 気象庁を優先（補完：Open-Meteo）` : '天気予報の詳細（Open-Meteo）';
+      ? `${forecast.jma.region} · 天気予報の詳細` : '天気予報の詳細';
     details.render(forecast, { icons, describe: describeWeather, ...options });
   }
   async function modelWeather(lat, lon) {
