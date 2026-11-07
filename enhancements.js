@@ -28,7 +28,8 @@ const calendar = month.initMonthCalendar({ classic, dates });
 const navigation = gestures.initCalendarGestures({ classic, calendar, dates });
 ui.protectDialogGestures();
 
-const classicURL = new URL(location.href);
+const classicURL = new URL('classic.html', location.href);
+classicURL.search = location.search;
 classicURL.searchParams.delete('next');
 const classicLink = ui.element('a', '', 'クラシック');
 classicLink.id = 'classicLink';
