@@ -27,6 +27,7 @@ export function initWeekCalendar({ classic, calendar, dates, ui, canOpen }) {
   let start = weekStart(new Date()),
     openerKey = '',
     minuteTimer;
+  const listeners = new Set();
 
   function updateCurrentTime() {
     scroll.querySelectorAll('.week-current-time').forEach((node) => node.remove());
@@ -80,9 +81,10 @@ export function initWeekCalendar({ classic, calendar, dates, ui, canOpen }) {
         holiday = holidays[key];
       const heading = element('div', 'week-column-title');
       heading.dataset.date = key;
+      heading.classList.toggle('week-holiday-date', Boolean(holiday));
       heading.setAttribute(
         'aria-label',
-        `${date.getFullYear()}年${shortDate(date)} ${weekdays[day]}曜日`
+        `${date.getFullYear()}年${shortDate(date)} ${weekdays[day]}曜日${holiday ? ` ${holiday}` : ''}`
       );
       heading.append(
         element('span', 'week-weekday', weekdays[day]),
@@ -120,6 +122,7 @@ export function initWeekCalendar({ classic, calendar, dates, ui, canOpen }) {
         ? Math.max(0, (now.getHours() + now.getMinutes() / 60) * height - visibleHeight * 0.4)
         : 8 * height;
     }
+    for (const listener of listeners) listener();
   }
   function open(key) {
     if (!canOpen() || dialog.open) return;
@@ -177,4 +180,6 @@ export function initWeekCalendar({ classic, calendar, dates, ui, canOpen }) {
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden && dialog.open) updateCurrentTime();
   });
+  return { dialog, scroll, getStart: () => new Date(start),
+    subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); } };
 }

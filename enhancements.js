@@ -6,7 +6,7 @@ const assetURL = (file) => {
   url.search = new URL(import.meta.url).search;
   return url;
 };
-for (const file of ['enhancements.css', 'weather-detail.css', 'timer.css', 'week-calendar.css']) {
+for (const file of ['enhancements.css', 'weather-detail.css', 'timer.css', 'week-calendar.css', 'google-calendar.css']) {
   const link = document.createElement('link');
   link.rel = 'stylesheet';
   link.href = assetURL(file);
@@ -78,7 +78,13 @@ badge.addEventListener('click', () => {
 // Weekly view is optional: its loading must not block the basic features.
 import(assetURL('week-calendar.js'))
   .then(({ initWeekCalendar }) => {
-    initWeekCalendar({ classic, calendar, dates, ui, canOpen: navigation.canOpenWeek });
+    const week = initWeekCalendar({ classic, calendar, dates, ui, canOpen: navigation.canOpenWeek });
+    // Calendar connections are optional and must not block the weekly view.
+    Promise.all(['google-calendar.js', 'calendar-events.js', 'google-calendar-view.js'].map(file => import(assetURL(file))))
+      .then(([identity, events, { initGoogleCalendarView }]) => {
+        initGoogleCalendarView({ week, ui, dates, service: identity.createGoogleCalendar(), identity, events });
+      })
+      .catch(() => console.warn('Googleカレンダーの接続機能を読み込めませんでした。'));
   })
   .catch((error) => {
     console.warn('週間カレンダーを読み込めませんでした。', error);
