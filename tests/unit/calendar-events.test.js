@@ -51,3 +51,15 @@ for (const [date, end] of [['2026-03-08', '2026-03-09'], ['2026-11-01', '2026-11
     assert.deepEqual(JSON.parse(result), [[0, 0, 1440]]);
   });
 }
+
+test('the same event ID on different calendars keeps separate identity and source details', () => {
+  const event = timed('same', '2026-11-05T10:00:00+09:00', '2026-11-05T11:00:00+09:00');
+  const segments = splitWeekEvents([
+    { ...event, calendarId: 'mine', calendarName: '自分', calendarColor: '#4285f4' },
+    { ...event, calendarId: 'family', calendarName: '家族', calendarColor: '#f4511e' }
+  ], start);
+  assert.equal(segments.length, 2);
+  assert.notEqual(segments[0].id, segments[1].id);
+  assert.deepEqual(segments.map(event => event.calendarName), ['自分', '家族']);
+  assert.ok(layoutTimedEvents(segments).every(event => event.columns === 2));
+});

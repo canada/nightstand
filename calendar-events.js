@@ -15,7 +15,7 @@ export function splitWeekEvents(events, weekStart) {
     const start = allDay ? localDate(event.start.date) : new Date(event.start?.dateTime || NaN);
     const end = allDay ? localDate(event.end?.date) : new Date(event.end?.dateTime || NaN);
     if (!start || !end || !Number.isFinite(+start) || !Number.isFinite(+end) || end <= start) continue;
-    const id = `${event.id || ''}/${+start}/${+end}`;
+    const id = JSON.stringify([event.calendarId || '', event.id || '', +start, +end]);
     if (seen.has(id)) continue;
     seen.add(id);
     const title = typeof event.summary === 'string' && event.summary.trim() ? event.summary.slice(0, 512) : '予定';
@@ -23,6 +23,7 @@ export function splitWeekEvents(events, weekStart) {
       const boundary = nextDay(date);
       if (start >= boundary || end <= date) continue;
       segments.push({ id, title, day, allDay, start, end,
+        calendarId: event.calendarId, calendarName: event.calendarName, calendarColor: event.calendarColor, holidayCalendar: event.holidayCalendar,
         startMinutes: start < date ? 0 : minutes(start),
         endMinutes: end >= boundary ? 1440 : Math.max(start < date ? 1 : minutes(start) + 1, minutes(end)) });
     }

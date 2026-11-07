@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { forecast, holidays } from '../support/forecast.js';
 const clientId = '1234567890-nightstandtest.apps.googleusercontent.com';
-const scope = 'https://www.googleapis.com/auth/calendar.events.readonly';
+const scope = 'https://www.googleapis.com/auth/calendar.events.readonly https://www.googleapis.com/auth/calendar.calendarlist.readonly';
 const api = 'https://www.googleapis.com/calendar/v3/calendars/primary/events**';
 const url = '/?next=1&lat=35.68&lon=139.76';
 const items = [
@@ -30,6 +30,7 @@ async function fixtures(page) {
       }};
     }}}};
   ` }));
+  await page.route('https://www.googleapis.com/calendar/v3/users/me/calendarList**', r => r.fulfill({ json: { items: [{ id: 'primary', summary: '自分の予定', primary: true, selected: true, accessRole: 'owner', backgroundColor: '#4285f4' }] } }));
   await page.route(api, r => r.fulfill({ json: { items } }));
 }
 test.beforeEach(async ({ page }) => fixtures(page));
@@ -299,4 +300,184 @@ test('repeated pagination tokens report failure without showing a partial succes
   await expect(page.locator('#googleCalendarStatus')).toContainText('取得できませんでした');
   await expect(page.locator('.google-event')).toHaveCount(0);
   expect(reads).toBe(2);
+});
+
+const calendarList = 'https://www.googleapis.com/calendar/v3/users/me/calendarList**';
+const allEvents = 'https://www.googleapis.com/calendar/v3/calendars/**';
+const familyId = 'family/name#shared@example.com';
+const holidayId = 'ja.japanese#holiday@group.v.calendar.google.com';
+const familyEvent = { ...items[0], summary: '家族の会議' };
+const sharedCalendars = [
+  { id: 'primary', summary: '自分の予定', primary: true, selected: true, accessRole: 'owner', backgroundColor: '#4285f4' },
+  { id: familyId, summary: '家族', selected: true, accessRole: 'reader', backgroundColor: '#f4511e' },
+  { id: holidayId, summary: '日本の祝日', selected: true, accessRole: 'reader', backgroundColor: '#0b8043' },
+  { id: 'busy-only', summary: '空き時間のみの人', selected: true, accessRole: 'freeBusyReader' }
+];
+function calendarIdOf(request) {
+  return decodeURIComponent(new URL(request.url()).pathname.split('/').at(-2));
+}
+async function sharedFixtures(page) {
+  await page.route(calendarList, route => route.fulfill({ json: { items: sharedCalendars } }));
+  await page.route(allEvents, route => {
+    const id = calendarIdOf(route.request());
+    return route.fulfill({ json: { items: id === familyId ? [familyEvent] : id === holidayId ? [
+      { id: 'holiday', summary: '文化の日', start: { date: '2026-11-03' }, end: { date: '2026-11-04' } }
+    ] : items } });
+  });
+}
+
+test('shared and holiday calendars are listed across pages, colored, and Japanese holidays appear once', async ({ page }) => {
+  await sharedFixtures(page);
+  let listReads = 0;
+  await page.route(calendarList, route => {
+    listReads++;
+    const next = new URL(route.request().url()).searchParams.has('pageToken');
+    return route.fulfill({ json: next ? { items: sharedCalendars.slice(1) } : { items: sharedCalendars.slice(0, 1), nextPageToken: 'more-calendars' } });
+  });
+  await openWeek(page);
+  await connect(page);
+  await expect(page.locator('.google-timed-event')).toHaveCount(3);
+  const family = page.getByRole('button', { name: '10:00 家族の会議', exact: true });
+  await expect(family).toHaveCSS('border-left-color', 'rgb(244, 81, 30)');
+  await expect(page.locator('.week-holiday').filter({ hasText: '文化の日' })).toHaveCount(1);
+  await expect(page.locator('.google-all-day-event').filter({ hasText: '文化の日' })).toHaveCount(0);
+  await expect(page.locator('.week-column-title[data-date="2026-11-03"]')).toHaveClass(/week-holiday-date/);
+  expect(listReads).toBe(2);
+  await family.click();
+  await expect(page.locator('#googleEventContents')).toContainText('家族');
+  await page.keyboard.press('Escape');
+  await openSettings(page);
+  await expect(page.getByRole('checkbox', { name: '家族', exact: true })).toBeChecked();
+  await expect(page.getByRole('checkbox', { name: /空き時間のみの人/ })).toBeDisabled();
+  const stored = await page.evaluate(() => JSON.stringify([localStorage, sessionStorage]));
+  expect(stored).not.toContain(familyId);
+  expect(stored).not.toContain('家族');
+});
+
+test('deselected calendars disappear, stale responses cannot restore them and selecting none keeps Japanese holidays', async ({ page }) => {
+  await sharedFixtures(page);
+  await openWeek(page);
+  await connect(page);
+  let release;
+  const held = new Promise(resolve => { release = resolve; });
+  await page.route(allEvents, async route => {
+    if (calendarIdOf(route.request()) === familyId) { await held; await route.fulfill({ json: { items: [familyEvent] } }).catch(() => {}); }
+    else await route.fulfill({ json: { items } });
+  });
+  const requested = page.waitForRequest(request => request.url().includes(encodeURIComponent(familyId)));
+  await page.locator('#googleCalendarRefresh').click();
+  await requested;
+  await openSettings(page);
+  await page.getByRole('checkbox', { name: '家族', exact: true }).uncheck();
+  await expect(page.getByRole('button', { name: '10:00 家族の会議', exact: true })).toHaveCount(0);
+  release();
+  await page.getByRole('checkbox', { name: '自分の予定', exact: true }).uncheck();
+  await page.getByRole('checkbox', { name: '日本の祝日', exact: true }).uncheck();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#googleCalendarStatus')).toContainText('表示するカレンダーを選んでください');
+  await expect(page.locator('.google-event')).toHaveCount(0);
+  await expect(page.locator('.week-holiday').filter({ hasText: '文化の日' })).toBeVisible();
+  await page.clock.fastForward(300001);
+  await expect(page.locator('.google-event')).toHaveCount(0);
+});
+
+test('one inaccessible calendar clears only its private data and keeps successful calendars', async ({ page }) => {
+  await sharedFixtures(page);
+  await openWeek(page);
+  await connect(page);
+  await page.getByRole('button', { name: '10:00 家族の会議', exact: true }).click();
+  await page.route(allEvents, route => calendarIdOf(route.request()) === familyId
+    ? route.fulfill({ status: 403, json: {} }) : route.fulfill({ json: { items: calendarIdOf(route.request()) === 'primary' ? items : [] } }));
+  await page.clock.fastForward(300001);
+  await expect(page.locator('#googleEventDialog')).not.toBeVisible();
+  await expect(page.locator('#googleEventContents')).toBeEmpty();
+  await expect(page.locator('.google-timed-event')).toHaveCount(2);
+  await expect(page.locator('#googleCalendarStatus')).toContainText('家族');
+  await expect(page.locator('#googleCalendarStatus')).not.toContainText('前回取得した予定');
+});
+
+test('a removed subscription clears its events even if other calendar requests are still pending', async ({ page }) => {
+  await sharedFixtures(page);
+  await openWeek(page);
+  await connect(page);
+  await page.route(calendarList, route => route.fulfill({ json: { items: sharedCalendars.filter(calendar => calendar.id !== familyId) } }));
+  let release;
+  const held = new Promise(resolve => { release = resolve; });
+  await page.route(allEvents, async route => { await held; await route.fulfill({ json: { items } }).catch(() => {}); });
+  const requested = page.waitForRequest(allEvents);
+  await page.locator('#googleCalendarRefresh').click();
+  await requested;
+  await expect(page.getByRole('button', { name: '10:00 家族の会議', exact: true })).toHaveCount(0);
+  release();
+  await expect(page.locator('#googleCalendarStatus')).toContainText('最終更新');
+  await openSettings(page);
+  await expect(page.getByRole('checkbox', { name: '家族', exact: true })).toHaveCount(0);
+});
+
+test('a calendar permission change drops old private data before the new request returns', async ({ page }) => {
+  await sharedFixtures(page);
+  await openWeek(page);
+  await connect(page);
+  await page.getByRole('button', { name: '10:00 家族の会議', exact: true }).click();
+  await page.route(calendarList, route => route.fulfill({ json: { items: sharedCalendars.map(calendar => calendar.id === familyId ? { ...calendar, accessRole: 'freeBusyReader' } : calendar) } }));
+  await page.clock.fastForward(300001);
+  await expect(page.locator('#googleEventDialog')).not.toBeVisible();
+  await expect(page.getByRole('button', { name: '10:00 家族の会議', exact: true })).toHaveCount(0);
+  await expect(page.locator('#googleEventContents')).toBeEmpty();
+  await expect(page.locator('.google-timed-event')).toHaveCount(2);
+});
+
+test('event-only consent is insufficient for listing shared calendars', async ({ page }) => {
+  await openWeek(page);
+  await openSettings(page);
+  await page.evaluate(() => {
+    window.googleMock.mode = 'pending';
+    window.google.accounts.oauth2.initTokenClient = config => ({ requestAccessToken() {
+      config.callback({ access_token: 'fake-calendar-token', scope: 'https://www.googleapis.com/auth/calendar.events.readonly', expires_in: 3600 });
+    } });
+  });
+  await page.locator('#googleClientId').fill(clientId);
+  await page.locator('#googleCalendarConnect').click();
+  await expect(page.locator('#googleCalendarHelp')).toContainText('カレンダー一覧');
+  await expect(page.locator('.google-event')).toHaveCount(0);
+});
+
+
+test('a failed shared calendar keeps its marked stale snapshot while another calendar updates', async ({ page }) => {
+  await sharedFixtures(page);
+  await openWeek(page);
+  await connect(page);
+  await page.route(allEvents, route => {
+    const id = calendarIdOf(route.request());
+    if (id === familyId) return route.abort();
+    return route.fulfill({ json: { items: id === 'primary' ? [{ ...items[0], summary: '更新された自分の予定' }] : [] } });
+  });
+  await page.locator('#googleCalendarRefresh').click();
+  await expect(page.locator('#googleCalendarStatus')).toContainText('前回取得した予定');
+  await expect(page.getByRole('button', { name: '10:00 家族の会議', exact: true })).toHaveCount(1);
+  await expect(page.getByRole('button', { name: '10:00 更新された自分の予定', exact: true })).toHaveCount(1);
+});
+
+test('updated event details replace the previously shown title when sharing visibility changes', async ({ page }) => {
+  await sharedFixtures(page);
+  await openWeek(page);
+  await connect(page);
+  await page.getByRole('button', { name: '10:00 家族の会議', exact: true }).click();
+  await page.route(allEvents, route => route.fulfill({ json: { items: calendarIdOf(route.request()) === familyId
+    ? [{ ...familyEvent, summary: '予定あり' }] : calendarIdOf(route.request()) === 'primary' ? items : [] } }));
+  await page.clock.fastForward(300001);
+  await expect(page.locator('#googleEventContents')).toContainText('予定あり');
+  await expect(page.locator('#googleEventContents')).not.toContainText('家族の会議');
+});
+
+test('calendar-list permission denial clears the whole connection and its private metadata', async ({ page }) => {
+  await sharedFixtures(page);
+  await openWeek(page);
+  await connect(page);
+  await page.route(calendarList, route => route.fulfill({ status: 403, json: {} }));
+  await page.locator('#googleCalendarRefresh').click();
+  await expect(page.locator('.google-event')).toHaveCount(0);
+  await expect(page.locator('#googleCalendarChoices')).toBeEmpty();
+  await expect(page.locator('#googleCalendarDisconnect')).not.toBeVisible();
+  await expect(page.locator('#googleCalendarStatus')).toContainText('一覧の読み取り権限');
 });

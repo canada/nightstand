@@ -81,9 +81,10 @@ export function initWeekCalendar({ classic, calendar, dates, ui, canOpen }) {
         holiday = holidays[key];
       const heading = element('div', 'week-column-title');
       heading.dataset.date = key;
+      heading.classList.toggle('week-holiday-date', Boolean(holiday));
       heading.setAttribute(
         'aria-label',
-        `${date.getFullYear()}年${shortDate(date)} ${weekdays[day]}曜日`
+        `${date.getFullYear()}年${shortDate(date)} ${weekdays[day]}曜日${holiday ? ` ${holiday}` : ''}`
       );
       heading.append(
         element('span', 'week-weekday', weekdays[day]),
