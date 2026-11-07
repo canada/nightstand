@@ -26,3 +26,8 @@
 .forecast-notice{padding:12px 14px;margin-bottom:20px;border:1px solid var(--label4);border-radius:16px}
 @media(max-width:430px){.forecast-day{grid-template-columns:68px 26px minmax(0,1fr) 32px 30px 30px;gap:6px}.forecast-condition{font-size:10px}.forecast-facts>div{padding:12px}.forecast-facts dd{font-size:16px}}
 @media(max-height:450px) and (min-width:550px){.forecast-current{float:left;width:42%;padding-right:26px}.forecast-facts{min-height:130px}.forecast-section{clear:both}.forecast-temperature{font-size:66px}.forecast-current svg{width:66px;height:66px}}
+
+.forecast-fact-source{display:block;color:var(--label2);font-size:10px;margin-top:4px}
+.forecast-section-source{margin:-7px 0 12px}
+.forecast-source-times{display:block;margin:6px 0;line-height:1.6}
+.forecast-provider-note{margin-top:10px;line-height:1.6}

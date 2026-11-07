@@ -1,6 +1,7 @@
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);
+const externalWeather = document.currentScript?.dataset.weather === 'external';
 const SVGNS = 'http://www.w3.org/2000/svg';
 const WD = ['日','月','火','水','木','金','土'];
 const pad = n => String(n).padStart(2,'0');
@@ -167,6 +168,7 @@ function getPos() {
   });
 }
 async function loadWeather() {
+  if (externalWeather) return;
   const c = store.get('wx');
   if (c) renderWx(c);
   if (c && Date.now() - c.t < 15*60e3) return;

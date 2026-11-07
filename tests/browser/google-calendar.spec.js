@@ -14,6 +14,7 @@ async function fixtures(page) {
   await page.clock.install({ time: new Date('2026-11-05T12:00:00+09:00') });
   await page.route('https://www8.cao.go.jp/**', r => r.fulfill({ status: 503, body: '' }));
   await page.route('https://holidays-jp.github.io/**', r => r.fulfill({ json: holidays }));
+  await page.route('https://www.jma.go.jp/**', route => route.abort());
   await page.route('https://api.open-meteo.com/**', r => r.fulfill({ json: forecast }));
   await page.route('https://accounts.google.com/gsi/client', r => r.fulfill({ contentType: 'text/javascript', body: `
     window.googleMock={mode:'success',expires:3600,requests:0};
