@@ -140,3 +140,13 @@ test('JMA details fit the iPhone 15 Pro viewport and keep the source reachable',
   await page.locator('.forecast-source').scrollIntoViewIfNeeded();
   await expect(page.locator('.forecast-source a').first()).toBeInViewport();
 });
+
+test('an old cached classic loader cannot race and overwrite the JMA weather', async ({ page }) => {
+  await page.route(target => target.pathname === '/classic.js' && !target.search, route => route.fulfill({
+    contentType: 'text/javascript', body: 'throw new Error("stale classic weather loader");'
+  }));
+  await ready(page);
+  await expect(page.locator('#wxSub2')).toHaveText('最高21° 最低10°');
+  await details(page);
+  await expect(page.locator('.forecast-source')).toContainText('気象庁');
+});
