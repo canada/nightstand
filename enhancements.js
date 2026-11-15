@@ -56,7 +56,7 @@ badge.hidden = true;
 badge.setAttribute('aria-live', 'off');
 clock.append(badge);
 NightstandTimer.init({ onStart() { timerDialog.close(); $('clock').focus(); } });
-const weather = forecast.initForecast({ classic, details: window.NightstandWeather });
+const weather = forecast.initForecast({ classic, details: window.NightstandWeather, loadJma: () => import(assetURL('jma-weather.js')) });
 
 if (!$('wxSub').textContent) $('wxSub').textContent = '天気予報を開く';
 if (!$('wxTemp').textContent) $('wxTemp').textContent = '—';

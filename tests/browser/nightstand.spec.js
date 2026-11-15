@@ -11,6 +11,7 @@ test.beforeEach(async ({ page }) => {
   await page.route('https://holidays-jp.github.io/**', (route) =>
     route.fulfill({ json: holidays })
   );
+  await page.route('https://www.jma.go.jp/**', route => route.abort());
   await page.route('https://api.open-meteo.com/**', (route) => route.fulfill({ json: forecast }));
 });
 
