@@ -98,3 +98,20 @@ test('supplemental values cannot make the daily low exceed the JMA high', () => 
   assert.equal(result.daily.temperature_2m_max[0],21);
   assert.equal(result.daily.temperature_2m_min[0],null);
 });
+
+test('local model temperatures replace a distant forecast station while JMA remains the fallback', () => {
+  const jma = {
+    region:'東京地方', office:'130000', forecast:decode(jmaForecast),
+    observation:{station:'練馬',temperature_2m:16.2}
+  };
+  const local = combineForecast(forecast,jma,now);
+  assert.equal(local.daily.temperature_2m_max[0],20);
+  assert.equal(local.daily.temperature_2m_max[2],20);
+  assert.equal(local.daily.temperature_2m_min[2],10);
+  assert.equal(local.daily.sources[0].temperature_2m_max,'Open-Meteo');
+  assert.equal(local.current.temperature_2m,16.2);
+  assert.equal(local.current.description,'晴れ');
+  const fallback = combineForecast(null,jma,now);
+  assert.equal(fallback.daily.temperature_2m_max[0],21);
+  assert.equal(fallback.daily.temperature_2m_max[2],14);
+});

@@ -154,16 +154,26 @@ function renderWx(w) {
   $('wxSub2').textContent = `最高${Math.round(w.max)}° 最低${Math.round(w.min)}°`;
   $('wx').classList.add('on');
 }
-function getPos() {
+function getPos({enableHighAccuracy = false, maximumAge = 6*3600e3} = {}) {
+  const valid = position => Number.isFinite(position?.lat) && Math.abs(position.lat) <= 90 &&
+    Number.isFinite(position.lon) && Math.abs(position.lon) <= 180;
   const lat = parseFloat(qs.get('lat')), lon = parseFloat(qs.get('lon'));
-  if (!isNaN(lat) && !isNaN(lon)) return Promise.resolve({lat, lon});
-  const saved = store.get('pos');
+  if (valid({lat, lon})) return Promise.resolve({lat, lon, source:'query'});
+  const cached = store.get('pos');
+  const saved = valid(cached) ? cached : null;
+  const fallback = () => saved ? {...saved, source:'saved'} : {lat:35.681, lon:139.767, source:'default'};
   return new Promise(res => {
-    if (!navigator.geolocation) return res(saved || {lat:35.681, lon:139.767});
+    if (!navigator.geolocation) return res(fallback());
     navigator.geolocation.getCurrentPosition(
-      p => { const v = {lat:+p.coords.latitude.toFixed(3), lon:+p.coords.longitude.toFixed(3)}; store.set('pos', v); res(v); },
-      () => res(saved || {lat:35.681, lon:139.767}),
-      {maximumAge: 6*3600e3, timeout: 10000}
+      p => {
+        const digits = enableHighAccuracy ? 4 : 3;
+        const position = {lat:+p.coords.latitude.toFixed(digits), lon:+p.coords.longitude.toFixed(digits)};
+        if (!valid(position)) return res(fallback());
+        store.set('pos', position);
+        res({...position, source:'device'});
+      },
+      () => res(fallback()),
+      {enableHighAccuracy, maximumAge, timeout:10000}
     );
   });
 }

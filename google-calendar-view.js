@@ -18,9 +18,12 @@ export function initGoogleCalendarView({ week, ui, dates, service, events, ident
     return node;
   };
   const openButton = button('Googleカレンダー', 'googleCalendarSettings', openSettings);
+  const reconnectButton = button('Googleに再接続', 'googleCalendarReconnect', () => {
+    service.connect(clientInput.value.trim(), { reconnect: true });
+  });
   const refreshButton = button('更新', 'googleCalendarRefresh', () => { void service.refresh(); });
   const disconnectButton = button('切断', 'googleCalendarDisconnect', () => service.disconnect());
-  actions.append(openButton, refreshButton, disconnectButton);
+  actions.append(openButton, reconnectButton, refreshButton, disconnectButton);
   footer.append(actions, status);
   const settings = ui.createSheet({ name: 'googleCalendar', eyebrow: 'CALENDAR', title: 'Googleカレンダー', contentId: 'googleCalendarContents' });
   settings.querySelector('#googleCalendarContents').innerHTML = `
@@ -28,7 +31,7 @@ export function initGoogleCalendarView({ week, ui, dates, service, events, ident
     <form id="googleCalendarForm" class="google-form">
       <label for="googleClientId">GoogleのアプリID<span class="sheet-note">（OAuthクライアントID）</span></label>
       <input id="googleClientId" type="text" autocomplete="off" spellcheck="false" maxlength="300" placeholder="…apps.googleusercontent.com" required>
-      <p class="sheet-note">このIDだけをブラウザーに保存します。パスワードやシークレットは入力しません。</p>
+      <p id="googleClientStorageStatus" class="sheet-note">このIDだけをブラウザーに保存します。パスワードやシークレットは入力しません。</p>
       <button id="googleCalendarConnect" class="google-button" type="submit">Googleに接続</button>
       <button id="googleCalendarCancel" class="google-button" type="button">接続を解除</button>
     </form>
@@ -52,8 +55,36 @@ export function initGoogleCalendarView({ week, ui, dates, service, events, ident
   settings.querySelector('#googleCalendarSelection').after(cancelButton);
   const help = settings.querySelector('#googleCalendarHelp');
   const retry = settings.querySelector('#googleIdentityRetry');
+  const storageStatus = settings.querySelector('#googleClientStorageStatus');
+  const cookiePrefix = `${CLIENT_KEY}=`;
+  function readClientCookie() {
+    try {
+      const cookie = document.cookie.split('; ').find(item => item.startsWith(cookiePrefix));
+      return cookie ? decodeURIComponent(cookie.slice(cookiePrefix.length)) : '';
+    } catch { return ''; }
+  }
+  function saveClientId() {
+    const clientId = clientInput.value.trim();
+    if (!identity.validGoogleClientId(clientId)) return;
+    let saved = false;
+    try {
+      localStorage.setItem(CLIENT_KEY, clientId);
+      saved = localStorage.getItem(CLIENT_KEY) === clientId;
+    } catch {}
+    try {
+      const path = new URL('.', location.href).pathname;
+      const secure = location.protocol === 'https:' ? '; Secure' : '';
+      document.cookie = `${cookiePrefix}${encodeURIComponent(clientId)}; Path=${path}; Max-Age=31536000; SameSite=Lax${secure}`;
+      saved = readClientCookie() === clientId || saved;
+    } catch {}
+    storageStatus.textContent = saved
+      ? 'アプリIDをこのブラウザーに保存しました。'
+      : 'アプリIDを保存できません。ブラウザーでこのサイトのデータ保存を許可してください。';
+  }
   settings.querySelector('#googleAllowedOrigin').textContent = location.origin;
   try { clientInput.value = localStorage.getItem(CLIENT_KEY) || ''; } catch {}
+  if (!identity.validGoogleClientId(clientInput.value)) clientInput.value = readClientCookie();
+  if (!identity.validGoogleClientId(clientInput.value)) clientInput.value = '';
   settings.querySelector('details').open = !clientInput.value;
   const details = ui.createSheet({ name: 'googleEvent', eyebrow: 'GOOGLE CALENDAR', title: '予定', contentId: 'googleEventContents' });
   let ready = false, preparing = false, preparationError = '', previousStatus = 'disconnected', openEventId = null;
@@ -149,6 +180,8 @@ export function initGoogleCalendarView({ week, ui, dates, service, events, ident
     refreshButton.hidden = !connected;
     refreshButton.disabled = state.loading;
     disconnectButton.hidden = !connected && !connecting;
+    reconnectButton.hidden = connected || connecting || !identity.validGoogleClientId(clientInput.value.trim());
+    reconnectButton.disabled = !ready || preparing;
     connectButton.hidden = connected;
     connectButton.disabled = !ready || preparing || connecting;
     connectButton.textContent = connecting ? '接続中…' : state.status === 'expired' ? 'Googleに再接続' : 'Googleに接続';
@@ -181,6 +214,7 @@ export function initGoogleCalendarView({ week, ui, dates, service, events, ident
     void prepare();
   }
   retry.addEventListener('click', () => { void prepare(); });
+  clientInput.addEventListener('input', () => { saveClientId(); render(); });
   settings.querySelector('#googleCalendarForm').addEventListener('submit', event => {
     event.preventDefault();
     const clientId = clientInput.value.trim();
@@ -189,14 +223,15 @@ export function initGoogleCalendarView({ week, ui, dates, service, events, ident
       clientInput.focus();
       return;
     }
-    try { localStorage.setItem(CLIENT_KEY, clientId); } catch {}
-    service.connect(clientId);
+    saveClientId();
+    service.connect(clientId, { reconnect: service.getState().status === 'expired' });
   });
   cancelButton.addEventListener('click', () => service.disconnect());
   service.subscribe(render);
   const updateRange = () => {
     const start = week.getStart();
     service.setRange(start, dates.addDays(start, 7));
+    if (week.dialog.open && identity.validGoogleClientId(clientInput.value.trim())) void prepare();
     if (service.getState().updatedAt && Date.now() - service.getState().updatedAt >= 300000) void service.refresh();
     render();
   };

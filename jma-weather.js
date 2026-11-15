@@ -178,7 +178,8 @@ export function decodeJmaForecast(data, metadata, region, lat, lon, now = new Da
   if (weekTemp) {
     temperatureNames.add(weekTemp.area.name);
     weekTemps.timeDefines.forEach((date, i) => Object.assign(dayRow(date), {
-      min: jmaNumber(weekTemp.tempsMin[i]), max: jmaNumber(weekTemp.tempsMax[i])
+      min: jmaNumber(weekTemp.tempsMin[i]), max: jmaNumber(weekTemp.tempsMax[i]),
+      temperatureStation: weekTemp.area.name
     }));
   }
   const weather = seriesFor(shortBlock, 'weathers'), shortArea = areaFor(weather, [region.code]);
@@ -203,6 +204,7 @@ export function decodeJmaForecast(data, metadata, region, lat, lon, now = new Da
     const evening = Number(shortBlock.reportDatetime.slice(11, 13)) >= 17;
     weather.timeDefines.slice(0, 2).forEach((date, index) => {
       const row = dayRow(date);
+      row.temperatureStation = tempArea.area.name;
       if (index === 0) { row.min = null; if (!evening) row.max = jmaNumber(tempArea.temps[0]); }
       else {
         const offset = evening ? 0 : 2;
