@@ -115,7 +115,20 @@
     sources.append(credits);
     footer.append(sources);
     root.append(footer);
-    if(forecast.jmaUnavailable || forecast.modelUnavailable || forecast.jma && !forecast.jma.forecast && forecast.hasModel)root.append(el('p','sheet-note forecast-provider-note','一部の情報を取得できなかったため、取得できた情報や代替の予報を表示しています。'));
+    const partial = forecast.jmaUnavailable || forecast.modelUnavailable || forecast.modelFallback ||
+      forecast.jma && !forecast.jma.forecast && forecast.hasModel;
+    if (partial && !options.stale) {
+      const notice = el('div','forecast-provider-note');
+      const message = forecast.modelStale
+        ? '一部の情報を取得できなかったため、前回取得した予報も表示しています。'
+        : '一部の情報を取得できなかったため、取得できた情報や代替の予報を表示しています。';
+      notice.append(el('p','sheet-note',message));
+      const retry = el('button','sheet-action','再取得');
+      retry.type = 'button';
+      retry.addEventListener('click', () => options.retry?.());
+      notice.append(retry);
+      root.append(notice);
+    }
   }
   window.NightstandWeather = {render,showStatus};
 })();

@@ -205,3 +205,109 @@ for (const saved of [false, true]) test(`unavailable geolocation explains the ${
   await expect(page.locator('.forecast-location-note')).toHaveCount(0);
   await expect(page.locator('.forecast-current .forecast-caption')).toHaveText('東京');
 });
+
+const hanedaURL = '/?lat=35.5533&lon=139.7811';
+async function haneda(page) {
+  await page.route('https://www.jma.go.jp/bosai/amedas/const/amedastable.json', route => route.fulfill({ json: {
+    ...jmaStations, '44166': { lat: [35,33.2], lon: [139,46.8], kjName: '羽田' }
+  } }));
+  await page.route('https://www.jma.go.jp/bosai/amedas/data/map/**', route => route.fulfill({ json: {
+    ...jmaObservations, '44166': { temp: [14.1,0], wind: [2,0], precipitation1h: [1,0] }
+  } }));
+}
+const fact = (page, name) => page.locator('.forecast-facts > div').filter({ has: page.getByText(name, { exact: true }) }).locator('dd');
+
+test('Haneda humidity, apparent temperature and hourly forecasts survive a failed primary endpoint', async ({ page }) => {
+  await haneda(page);
+  await page.route('https://api.open-meteo.com/v1/forecast?**', route => route.fulfill({ status:503, body:'' }));
+  let backupRequest;
+  await page.route('https://api.open-meteo.com/v1/jma?**', route => {
+    backupRequest = new URL(route.request().url());
+    const backup = structuredClone(forecast);
+    delete backup.hourly.precipitation_probability;
+    delete backup.daily.precipitation_probability_max;
+    return route.fulfill({ json:backup });
+  });
+  await page.goto(hanedaURL);
+  await expect(page.locator('#wxTemp')).toHaveText('14°');
+  await details(page);
+  await expect(page.locator('.forecast-current .forecast-caption')).toHaveText('羽田');
+  await expect(fact(page,'体感温度')).toHaveText('17°');
+  await expect(fact(page,'湿度')).toHaveText('64%');
+  await expect(page.locator('.forecast-hour')).toHaveCount(12);
+  expect(backupRequest.searchParams.get('hourly')).not.toContain('precipitation_probability');
+  expect(backupRequest.searchParams.get('daily')).not.toContain('precipitation_probability_max');
+});
+
+test('a first supplemental outage retries after one minute and fills Haneda missing values', async ({ page }) => {
+  await haneda(page);
+  let unavailable = true;
+  await page.route(modelURL, route => unavailable ? route.abort() : route.fulfill({ json:forecast }));
+  await page.goto(hanedaURL);
+  await expect(page.locator('#wxTemp')).toHaveText('14°');
+  await details(page);
+  await expect(fact(page,'体感温度')).toHaveText('—');
+  await expect(fact(page,'湿度')).toHaveText('—');
+  await expect(page.locator('.forecast-hour')).toHaveCount(0);
+  unavailable = false;
+  await page.clock.fastForward(61000);
+  await expect(fact(page,'体感温度')).toHaveText('17°');
+  await expect(fact(page,'湿度')).toHaveText('64%');
+  await expect(page.locator('.forecast-hour')).toHaveCount(12);
+  await expect(page.locator('.forecast-provider-note')).toHaveCount(0);
+});
+
+test('a partial forecast does not block supplemental recovery for fifteen minutes after reload', async ({ page }) => {
+  await haneda(page);
+  const blocked = route => route.abort();
+  await page.route(modelURL,blocked);
+  await page.goto(hanedaURL);
+  await expect(page.locator('#wxTemp')).toHaveText('14°');
+  await details(page);
+  await expect(page.locator('.forecast-hour')).toHaveCount(0);
+  await page.unroute(modelURL,blocked);
+  await page.reload();
+  await details(page);
+  await expect(fact(page,'体感温度')).toHaveText('17°');
+  await expect(fact(page,'湿度')).toHaveText('64%');
+  await expect(page.locator('.forecast-hour')).toHaveCount(12);
+});
+
+test('a later outage preserves recent supplemental data while fresh Haneda observations update', async ({ page }) => {
+  await haneda(page);
+  await page.goto(hanedaURL);
+  await expect(page.locator('#wxTemp')).toHaveText('14°');
+  const blocked = route => route.abort();
+  await page.route(modelURL,blocked);
+  await page.route('https://www.jma.go.jp/bosai/amedas/data/map/**', route => route.fulfill({ json: {
+    ...jmaObservations, '44166': { temp: [16.5,0], wind: [2,0], precipitation1h: [1,0] }
+  } }));
+  await page.clock.fastForward(16 * 60000);
+  await expect(page.locator('#wxTemp')).toHaveText('17°');
+  await details(page);
+  await expect(fact(page,'体感温度')).toHaveText('17°');
+  await expect(fact(page,'湿度')).toHaveText('64%');
+  await expect(page.locator('.forecast-hour')).toHaveCount(12);
+  await expect(page.locator('.forecast-provider-note')).toContainText('前回取得した予報');
+  await page.unroute(modelURL,blocked);
+  await page.getByRole('button',{name:'再取得',exact:true}).click();
+  await expect(page.locator('.forecast-provider-note')).toHaveCount(0);
+});
+
+for (const invalid of ['old','other-location']) test(`supplemental data from ${invalid} is not reused for Haneda missing values`, async ({ page }) => {
+  await haneda(page);
+  await page.goto(hanedaURL);
+  await expect(page.locator('#wxTemp')).toHaveText('14°');
+  await page.evaluate(({ invalid }) => {
+    const saved = JSON.parse(localStorage.getItem('nsSupplementalForecastV1'));
+    if (invalid === 'old') saved.fetchedAt -= 61 * 60000;
+    else saved.locationKey = '49.28,-123.12';
+    localStorage.setItem('nsSupplementalForecastV1',JSON.stringify(saved));
+  },{invalid});
+  await page.route(modelURL,route => route.abort());
+  await page.clock.fastForward(16 * 60000);
+  await details(page);
+  await expect(fact(page,'体感温度')).toHaveText('—');
+  await expect(fact(page,'湿度')).toHaveText('—');
+  await expect(page.locator('.forecast-hour')).toHaveCount(0);
+});

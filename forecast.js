@@ -73,8 +73,14 @@ export function combineForecast(model, jma, now = new Date()) {
 export function initForecast({ classic, details, loadJma }) {
   const { store, icons, describeWeather, getPosition, renderWeather } = classic;
   details.showStatus('天気予報を取得しています…');
-  let weatherPromise = null;
+  let weatherPromise = null, retryTimer;
   const jmaProvider = loadJma().then(module => module.createJmaWeather({ store })).catch(() => null);
+  function retrySoon() {
+    clearTimeout(retryTimer);
+    retryTimer = setTimeout(() => {
+      if (!document.hidden) void loadWeather(true);
+    }, 60000);
+  }
   function showForecast(forecast, options = {}) {
     const c = forecast.current, d = forecast.daily;
     const index = d.time.indexOf(dayAt(new Date(), forecast.timezone));
@@ -88,7 +94,7 @@ export function initForecast({ classic, details, loadJma }) {
       document.getElementById('wxSub').textContent = c.description + (Number.isFinite(pop) && pop >= 20 ? ` · 降水${pop}%` : '');
     }
     document.getElementById('wx').title = '天気予報の詳細';
-    details.render(forecast, { icons, describe: describeWeather, ...options });
+    details.render(forecast, { icons, describe: describeWeather, retry: () => loadWeather(true), ...options });
   }
   async function modelWeather(lat, lon) {
     const params = new URLSearchParams({ latitude: lat, longitude: lon,
@@ -96,41 +102,79 @@ export function initForecast({ classic, details, loadJma }) {
       hourly: 'temperature_2m,weather_code,precipitation_probability,is_day',
       daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset',
       timezone: 'auto', forecast_days: '7', wind_speed_unit: 'ms' });
-    const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 15000);
-    try {
-      const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, { cache: 'no-store', signal: controller.signal });
-      if (!response.ok) throw new Error('Weather unavailable');
-      const data = await response.json();
-      if (!data.current || !data.daily?.time?.length || !data.hourly?.time?.length) throw new Error('Incomplete forecast');
-      return data;
-    } finally { clearTimeout(timeout); }
+    for (const endpoint of ['forecast', 'jma']) {
+      const query = new URLSearchParams(params);
+      if (endpoint === 'jma') {
+        // The JMA model endpoint does not supply precipitation probabilities.
+        query.set('hourly', 'temperature_2m,weather_code,is_day');
+        query.set('daily', 'weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset');
+      }
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+      try {
+        const response = await fetch(`https://api.open-meteo.com/v1/${endpoint}?${query}`, {
+          cache: 'no-store', credentials: 'omit', signal: controller.signal
+        });
+        if (!response.ok) continue;
+        const data = await response.json();
+        if (!data.current || !data.daily?.time?.length || !data.hourly?.time?.length) continue;
+        return { data, alternate: endpoint === 'jma' };
+      } catch {
+        // Try the other endpoint after a timeout, network error or invalid response.
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
+    throw new Error('Weather unavailable');
   }
   async function loadWeather(force = false) {
     if (weatherPromise) return weatherPromise;
+    clearTimeout(retryTimer);
     weatherPromise = (async () => {
       const location = await getPosition({ enableHighAccuracy: true, maximumAge: 0 });
       const { lat, lon } = location, locationKey = `${lat},${lon}`;
       const cached = store.get('nsForecastV2');
       const c = cached?.locationKey === locationKey && cached?.current && cached?.daily?.time?.length && cached?.hourly ? cached : null;
       if (c) { c.location = location; showForecast(c); }
-      if (!force && c?.weatherVersion === 1 && c.dayKey === dayAt(new Date(), c.timezone) && Date.now() - c.fetchedAt < 15 * 60000) return;
+      const completeCache = c?.weatherVersion === 2 && !c.modelUnavailable && !c.modelFallback && !c.jmaUnavailable;
+      if (!force && completeCache && c.dayKey === dayAt(new Date(), c.timezone) && Date.now() - c.fetchedAt < 15 * 60000) return;
       if (!c) details.showStatus('天気予報を取得しています…');
       const [model, jma] = await Promise.allSettled([
         modelWeather(lat, lon),
         jmaProvider.then(provider => { if (!provider) throw new Error('JMA unavailable'); return provider(lat, lon); })
       ]);
-      const modelData = model.status === 'fulfilled' ? model.value : null;
+      const freshModel = model.status === 'fulfilled' ? model.value.data : null;
       const jmaData = jma.status === 'fulfilled' ? jma.value : null;
-      if (!modelData && !jmaData?.forecast) {
-        if (c) showForecast(c, { stale: true, retry: () => loadWeather(true) });
-        else details.showStatus('天気予報を取得できませんでした。通信状況を確認して、もう一度お試しください。', () => loadWeather(true));
-        return;
+      if (freshModel) store.set('nsSupplementalForecastV1', { locationKey, fetchedAt: Date.now(), data: freshModel });
+      const previous = store.get('nsSupplementalForecastV1');
+      const previousData = previous?.data;
+      const recentModel = previous?.locationKey === locationKey && previousData?.current &&
+        previousData.daily?.time?.length && previousData.hourly?.time?.length &&
+        previous.fetchedAt <= Date.now() && Date.now() - previous.fetchedAt < 60 * 60000 &&
+        dayAt(new Date(previous.fetchedAt), previousData.timezone) === dayAt(new Date(), previousData.timezone);
+      const modelData = freshModel || (recentModel ? previousData : null);
+      if (!freshModel && !jmaData?.forecast) {
+        if (c) {
+          showForecast(c, { stale: true });
+          retrySoon();
+          return;
+        }
+        if (!modelData) {
+          details.showStatus('天気予報を取得できませんでした。通信状況を確認して、もう一度お試しください。', () => loadWeather(true));
+          retrySoon();
+          return;
+        }
       }
       const forecast = combineForecast(modelData, jmaData);
-      Object.assign(forecast, { location, locationKey, weatherVersion: 1, fetchedAt: Date.now(), dayKey: dayAt(new Date(), forecast.timezone),
-        jmaUnavailable: jma.status === 'rejected', modelUnavailable: !modelData });
+      Object.assign(forecast, {
+        location, locationKey, weatherVersion: 2, fetchedAt: Date.now(), dayKey: dayAt(new Date(), forecast.timezone),
+        jmaUnavailable: jma.status === 'rejected', modelUnavailable: !freshModel,
+        modelStale: !freshModel && Boolean(modelData),
+        modelFallback: model.status === 'fulfilled' && model.value.alternate
+      });
       store.set('nsForecastV2', forecast);
       showForecast(forecast);
+      if (forecast.modelUnavailable || forecast.modelFallback) retrySoon();
     })().catch(() => details.showStatus('天気予報を取得できませんでした。もう一度お試しください。', () => loadWeather(true)))
       .finally(() => { weatherPromise = null; });
     return weatherPromise;
