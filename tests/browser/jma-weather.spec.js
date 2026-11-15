@@ -183,7 +183,7 @@ test('fresh device coordinates near Nishi-Tokyo select nearby observations and l
   expect(modelRequests[0].searchParams.get('longitude')).toBe('139.5383');
 });
 
-for (const saved of [false, true]) test(`unavailable geolocation explains the ${saved ? 'previous location' : 'Tokyo fallback'} and can retry`, async ({ page }) => {
+for (const saved of [false, true]) test(`unavailable geolocation explains the ${saved ? 'previous location' : 'Tokyo fallback'} and recovers on scheduled refresh`, async ({ page }) => {
   await page.addInitScript(({ saved }) => {
     if (saved) localStorage.setItem('pos', JSON.stringify({ lat: 35.726, lon: 139.538 }));
     window.positionAvailable = false;
@@ -196,8 +196,9 @@ for (const saved of [false, true]) test(`unavailable geolocation explains the ${
   await expect(page.locator('#wxTemp')).toHaveText('23°');
   await details(page);
   await expect(page.locator('.forecast-location-note')).toContainText(saved ? '前回の場所' : '東京の天気');
+  await expect(page.getByRole('button', { name: '現在地で更新' })).toHaveCount(0);
   await page.evaluate(() => { window.positionAvailable = true; });
-  await page.getByRole('button', { name: '現在地で更新' }).click();
+  await page.clock.fastForward(16 * 60000);
   await expect(page.locator('.forecast-location-note')).toHaveCount(0);
   await expect(page.locator('.forecast-current .forecast-caption')).toHaveText('現在地周辺');
 });

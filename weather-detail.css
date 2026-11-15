@@ -31,5 +31,4 @@
 @media(max-height:450px) and (min-width:550px){.forecast-current{float:left;width:42%;padding-right:26px}.forecast-facts{min-height:130px}.forecast-section{clear:both}.forecast-temperature{font-size:66px}.forecast-current svg{width:66px;height:66px}}
 
 .forecast-location-note{margin-bottom:20px}
-.forecast-location-note button{margin-top:8px}
 .forecast-provider-note{margin-top:10px;line-height:1.6}

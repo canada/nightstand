@@ -88,7 +88,7 @@ export function initForecast({ classic, details, loadJma }) {
       document.getElementById('wxSub').textContent = c.description + (Number.isFinite(pop) && pop >= 20 ? ` · 降水${pop}%` : '');
     }
     document.getElementById('wx').title = '天気予報の詳細';
-    details.render(forecast, { icons, describe: describeWeather, retryLocation: () => loadWeather(true), ...options });
+    details.render(forecast, { icons, describe: describeWeather, ...options });
   }
   async function modelWeather(lat, lon) {
     const params = new URLSearchParams({ latitude: lat, longitude: lon,

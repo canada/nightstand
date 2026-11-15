@@ -54,13 +54,7 @@
       const message = locationSource === 'saved'
         ? '現在地を取得できなかったため、前回の場所を表示しています。'
         : '現在地を取得できなかったため、東京の天気を表示しています。';
-      const retry = el('button','sheet-action','現在地で更新');
-      retry.type = 'button';
-      retry.addEventListener('click', async () => {
-        retry.disabled = true;
-        try { await options.retryLocation?.(); } finally { retry.disabled = false; }
-      });
-      notice.append(el('p','sheet-note',message),retry);
+      notice.append(el('p','sheet-note',message));
       root.append(notice);
     }
     const facts = el('dl','forecast-facts');
