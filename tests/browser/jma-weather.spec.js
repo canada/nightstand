@@ -32,6 +32,7 @@ test('JMA observations and forecasts take precedence on the clock screen and sou
   await expect(page.locator('#wxSub2')).toHaveText('最高21° 最低10°');
   await details(page);
   await expect(page.locator('.forecast-description')).toContainText('今日の予報：晴れ');
+  await expect(page.locator('.forecast-current .forecast-caption')).toHaveText('東京');
   await expect(page.locator('.forecast-current')).not.toContainText(/観測所|観測/);
   await expect(page.locator('#weatherDetails')).not.toContainText(/府県予報|気温の予報地点|加工して表示/);
   await expect(page.locator('.forecast-facts')).toContainText('58%');
@@ -87,6 +88,8 @@ test('missing-quality observations use model values without replacing valid JMA 
   await expect(page.locator('#wxSub2')).toHaveText('最高21° 最低10°');
   await details(page);
   await expect(page.locator('.forecast-current')).not.toContainText('Open-Meteo');
+  await expect(page.locator('.forecast-current .forecast-caption')).toHaveText('指定地点周辺');
+  await expect(page.locator('.forecast-location-note')).toHaveCount(0);
 });
 
 test('overseas locations do not request unrelated Japanese regional forecasts', async ({ page }) => {
@@ -177,7 +180,7 @@ test('fresh device coordinates near Nishi-Tokyo select nearby observations and l
   await expect(page.locator('#wxTemp')).toHaveText('16°');
   await expect(page.locator('#wxSub2')).toHaveText('最高20° 最低10°');
   await details(page);
-  await expect(page.locator('.forecast-current .forecast-caption')).toHaveText('現在地周辺');
+  await expect(page.locator('.forecast-current .forecast-caption')).toHaveText('練馬');
   expect(await page.evaluate(() => window.positionOptions)).toMatchObject({ enableHighAccuracy: true, maximumAge: 0 });
   expect(modelRequests[0].searchParams.get('latitude')).toBe('35.7264');
   expect(modelRequests[0].searchParams.get('longitude')).toBe('139.5383');
@@ -200,5 +203,5 @@ for (const saved of [false, true]) test(`unavailable geolocation explains the ${
   await page.evaluate(() => { window.positionAvailable = true; });
   await page.clock.fastForward(16 * 60000);
   await expect(page.locator('.forecast-location-note')).toHaveCount(0);
-  await expect(page.locator('.forecast-current .forecast-caption')).toHaveText('現在地周辺');
+  await expect(page.locator('.forecast-current .forecast-caption')).toHaveText('東京');
 });

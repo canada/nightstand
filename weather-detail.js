@@ -46,7 +46,7 @@
     const description = el('div');
     const locationLabels = { device:'現在地周辺', query:'指定地点周辺', saved:'前回の場所周辺', default:'東京' };
     const locationSource = forecast.location?.source;
-    const caption = locationLabels[locationSource] || '現在の気温';
+    const caption = forecast.jma?.station || locationLabels[locationSource] || '現在の気温';
     description.append(el('p','forecast-caption',caption),el('p','forecast-temperature',value(c.temperature_2m,'°')),el('p','forecast-description',c.description ? `${c.conditionCaption}：${c.description}` : currentIcon.description || '天気データなし'));
     current.append(description,currentIcon.svg);root.append(current);
     if (locationSource === 'saved' || locationSource === 'default') {
