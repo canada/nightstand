@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { forecast, holidays } from '../support/forecast.js';
-import { jmaResponses, latest } from '../support/jma.js';
+import { jmaResponses, jmaStations, jmaObservations, latest } from '../support/jma.js';
 const url = '/?lat=35.68&lon=139.76';
 const modelURL = 'https://api.open-meteo.com/**';
 const jmaURL = 'https://www.jma.go.jp/**';
@@ -32,13 +32,15 @@ test('JMA observations and forecasts take precedence on the clock screen and sou
   await expect(page.locator('#wxSub2')).toHaveText('最高21° 最低10°');
   await details(page);
   await expect(page.locator('.forecast-description')).toContainText('今日の予報：晴れ');
-  await expect(page.locator('.forecast-region').filter({ hasText: '東京地方' })).toBeVisible();
-  await expect(page.getByText('東京観測所', { exact: false })).toBeVisible();
+  await expect(page.locator('.forecast-current')).not.toContainText(/観測所|観測/);
+  await expect(page.locator('#weatherDetails')).not.toContainText(/府県予報|気温の予報地点|加工して表示/);
   await expect(page.locator('.forecast-facts')).toContainText('58%');
   await expect(page.locator('.forecast-facts')).not.toContainText(/気象庁|Open-Meteo/);
   await expect(page.locator('.forecast-section').filter({ hasText: /気象庁|Open-Meteo/ })).toHaveCount(0);
-  await expect(page.locator('.forecast-source')).toContainText('出典：気象庁');
-  await expect(page.locator('.forecast-source')).toContainText('加工して表示');
+  await expect(page.locator('.forecast-source p')).not.toBeVisible();
+  await page.locator('.forecast-source summary').click();
+  await expect(page.locator('.forecast-source')).toContainText('気象庁');
+  await expect(page.locator('.forecast-source')).toContainText('Nightstandが作成');
   await expect(page.locator('.forecast-source')).toContainText('Open-Meteo');
   await expect(page.locator('.forecast-hour')).toHaveCount(12);
   await expect(page.locator('.forecast-day').first()).not.toHaveAttribute('title', /気象庁|Open-Meteo/);
@@ -139,6 +141,7 @@ test('JMA details fit the iPhone 15 Pro viewport and keep the source reachable',
   const widths = await dialog.evaluate(node => [node.clientWidth, node.scrollWidth]);
   expect(widths[1]).toBeLessThanOrEqual(widths[0] + 1);
   await page.locator('.forecast-source').scrollIntoViewIfNeeded();
+  await page.locator('.forecast-source summary').click();
   await expect(page.locator('.forecast-source a').first()).toBeInViewport();
 });
 
@@ -150,4 +153,51 @@ test('an old cached classic loader cannot race and overwrite the JMA weather', a
   await expect(page.locator('#wxSub2')).toHaveText('最高21° 最低10°');
   await details(page);
   await expect(page.locator('.forecast-source')).toContainText('気象庁');
+});
+
+test('fresh device coordinates near Nishi-Tokyo select nearby observations and local temperature forecasts', async ({ page }) => {
+  const modelRequests = [];
+  await page.addInitScript(() => {
+    navigator.geolocation.getCurrentPosition = (success, failure, options) => {
+      window.positionOptions = options;
+      success({ coords: { latitude: 35.72641, longitude: 139.53832 } });
+    };
+  });
+  await page.route('https://www.jma.go.jp/bosai/amedas/const/amedastable.json', route => route.fulfill({ json: {
+    ...jmaStations, '44071': { lat: [35,44.3], lon: [139,35.5], kjName: '練馬' }
+  } }));
+  await page.route('https://www.jma.go.jp/bosai/amedas/data/map/**', route => route.fulfill({ json: {
+    ...jmaObservations, '44071': { temp: [16.2,0], humidity: [60,0], wind: [1.5,0], precipitation1h: [0,0] }
+  } }));
+  await page.route(modelURL, route => {
+    modelRequests.push(new URL(route.request().url()));
+    return route.fulfill({ json: forecast });
+  });
+  await page.goto('/');
+  await expect(page.locator('#wxTemp')).toHaveText('16°');
+  await expect(page.locator('#wxSub2')).toHaveText('最高20° 最低10°');
+  await details(page);
+  await expect(page.locator('.forecast-current .forecast-caption')).toHaveText('現在地周辺');
+  expect(await page.evaluate(() => window.positionOptions)).toMatchObject({ enableHighAccuracy: true, maximumAge: 0 });
+  expect(modelRequests[0].searchParams.get('latitude')).toBe('35.7264');
+  expect(modelRequests[0].searchParams.get('longitude')).toBe('139.5383');
+});
+
+for (const saved of [false, true]) test(`unavailable geolocation explains the ${saved ? 'previous location' : 'Tokyo fallback'} and can retry`, async ({ page }) => {
+  await page.addInitScript(({ saved }) => {
+    if (saved) localStorage.setItem('pos', JSON.stringify({ lat: 35.726, lon: 139.538 }));
+    window.positionAvailable = false;
+    navigator.geolocation.getCurrentPosition = (success, failure) => {
+      if (window.positionAvailable) success({ coords: { latitude: 35.726, longitude: 139.538 } });
+      else failure({ code: 1 });
+    };
+  }, { saved });
+  await page.goto('/');
+  await expect(page.locator('#wxTemp')).toHaveText('23°');
+  await details(page);
+  await expect(page.locator('.forecast-location-note')).toContainText(saved ? '前回の場所' : '東京の天気');
+  await page.evaluate(() => { window.positionAvailable = true; });
+  await page.getByRole('button', { name: '現在地で更新' }).click();
+  await expect(page.locator('.forecast-location-note')).toHaveCount(0);
+  await expect(page.locator('.forecast-current .forecast-caption')).toHaveText('現在地周辺');
 });

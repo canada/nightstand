@@ -4,7 +4,7 @@ const API = 'https://www.googleapis.com/calendar/v3/';
 export const validGoogleClientId = value => /^\d+-[\w-]+\.apps\.googleusercontent\.com$/.test(value);
 let identityLoading;
 
-// Load Google's official library only when connection settings are opened.
+// Prepare sign-in after opening settings or a week with a saved app ID.
 export function prepareGoogleIdentity() {
   if (window.google?.accounts?.oauth2) return Promise.resolve();
   if (identityLoading) return identityLoading;
@@ -189,7 +189,7 @@ export function createGoogleCalendar() {
       if (current()) { state.loading = false; emit(); }
     }
   }
-  function connect(clientId) {
+  function connect(clientId, { reconnect = false } = {}) {
     if (state.status === 'connecting' || state.status === 'connected') return;
     if (!validGoogleClientId(clientId) || !window.google?.accounts?.oauth2) {
       clear('disconnected', '接続設定を確認し、もう一度接続してください。');
@@ -201,7 +201,7 @@ export function createGoogleCalendar() {
     authTimer = setTimeout(() => fail('接続が完了しませんでした。ログイン画面を閉じて、もう一度接続してください。'), 120000);
     try {
       const client = window.google.accounts.oauth2.initTokenClient({
-        client_id: clientId, scope: SCOPES.join(' '), include_granted_scopes: false, prompt: 'select_account',
+        client_id: clientId, scope: SCOPES.join(' '), include_granted_scopes: false, prompt: reconnect ? '' : 'select_account',
         callback(response) {
           if (attempt !== session || state.status !== 'connecting') return;
           if (!response) { fail('Googleから接続情報を受け取れませんでした。もう一度接続してください。'); return; }

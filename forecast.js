@@ -19,8 +19,12 @@ export function combineForecast(model, jma, now = new Date()) {
   }
   for (const day of jma.forecast?.days || []) {
     const row = rows.get(day.date) || { date: day.date, sources: {} };
+    // A regional temperature forecast may use a city far from the user's nearest station.
+    const localTemperatures = jma.observation?.station && day.temperatureStation &&
+      jma.observation.station !== day.temperatureStation;
     for (const [key, value] of Object.entries({ weather_code: day.weather_code, temperature_2m_max: day.max,
       temperature_2m_min: day.min, precipitation_probability_max: day.pop })) {
+      if (localTemperatures && key.startsWith('temperature_2m_') && Number.isFinite(row[key])) continue;
       if (Number.isFinite(value)) { row[key] = value; row.sources[key] = '気象庁'; }
     }
     row.description = day.description;
@@ -83,9 +87,8 @@ export function initForecast({ classic, details, loadJma }) {
       const pop = d.precipitation_probability_max?.[index];
       document.getElementById('wxSub').textContent = c.description + (Number.isFinite(pop) && pop >= 20 ? ` · 降水${pop}%` : '');
     }
-    document.getElementById('wx').title = forecast.jma
-      ? `${forecast.jma.region} · 天気予報の詳細` : '天気予報の詳細';
-    details.render(forecast, { icons, describe: describeWeather, ...options });
+    document.getElementById('wx').title = '天気予報の詳細';
+    details.render(forecast, { icons, describe: describeWeather, retryLocation: () => loadWeather(true), ...options });
   }
   async function modelWeather(lat, lon) {
     const params = new URLSearchParams({ latitude: lat, longitude: lon,
@@ -105,11 +108,12 @@ export function initForecast({ classic, details, loadJma }) {
   async function loadWeather(force = false) {
     if (weatherPromise) return weatherPromise;
     weatherPromise = (async () => {
-      const { lat, lon } = await getPosition(), locationKey = `${lat},${lon}`;
+      const location = await getPosition({ enableHighAccuracy: true, maximumAge: 0 });
+      const { lat, lon } = location, locationKey = `${lat},${lon}`;
       const cached = store.get('nsForecastV2');
       const c = cached?.locationKey === locationKey && cached?.current && cached?.daily?.time?.length && cached?.hourly ? cached : null;
-      if (c) showForecast(c);
-      if (!force && c && c.dayKey === dayAt(new Date(), c.timezone) && Date.now() - c.fetchedAt < 15 * 60000) return;
+      if (c) { c.location = location; showForecast(c); }
+      if (!force && c?.weatherVersion === 1 && c.dayKey === dayAt(new Date(), c.timezone) && Date.now() - c.fetchedAt < 15 * 60000) return;
       if (!c) details.showStatus('天気予報を取得しています…');
       const [model, jma] = await Promise.allSettled([
         modelWeather(lat, lon),
@@ -123,7 +127,7 @@ export function initForecast({ classic, details, loadJma }) {
         return;
       }
       const forecast = combineForecast(modelData, jmaData);
-      Object.assign(forecast, { locationKey, fetchedAt: Date.now(), dayKey: dayAt(new Date(), forecast.timezone),
+      Object.assign(forecast, { location, locationKey, weatherVersion: 1, fetchedAt: Date.now(), dayKey: dayAt(new Date(), forecast.timezone),
         jmaUnavailable: jma.status === 'rejected', modelUnavailable: !modelData });
       store.set('nsForecastV2', forecast);
       showForecast(forecast);

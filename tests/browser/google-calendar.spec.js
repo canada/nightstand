@@ -20,6 +20,7 @@ async function fixtures(page) {
     window.googleMock={mode:'success',expires:3600,requests:0};
     window.google={accounts:{oauth2:{initTokenClient(config){
       window.googleConfig={scope:config.scope,include_granted_scopes:config.include_granted_scopes};
+      window.googlePrompt=config.prompt;
       window.completeGoogleAuth=()=>config.callback({access_token:'fake-calendar-token',scope:${JSON.stringify(scope)},expires_in:window.googleMock.expires});
       return {requestAccessToken(){
         window.googleMock.requests++;
@@ -74,7 +75,7 @@ test('connection requests only event reads, follows all pages, lays out overlaps
   expect(query.get('singleEvents')).toBe('true');
   expect(requests[0].headers().authorization).toBe('Bearer fake-calendar-token');
   expect(await page.evaluate(() => window.googleConfig)).toEqual({ scope, include_granted_scopes: false });
-  const stored = await page.evaluate(() => JSON.stringify([localStorage, sessionStorage, location.href]));
+  const stored = await page.evaluate(() => JSON.stringify([localStorage, sessionStorage, document.cookie, location.href]));
   expect(stored).not.toContain('fake-calendar-token');
   expect(stored).not.toContain('会議A');
   await page.getByRole('button', { name: '10:00 会議A', exact: true }).click();
@@ -154,7 +155,7 @@ test('a cancelled authorization cannot reconnect through its late callback', asy
   await expect(page.locator('.google-event')).toHaveCount(0);
 });
 
-test('token expiry clears events and open event details and offers reconnect without opening a popup', async ({ page }) => {
+test('token expiry clears private events and reconnects with one click using the saved app ID', async ({ page }) => {
   await openWeek(page);
   await openSettings(page);
   await page.evaluate(() => { window.googleMock.expires = 60; });
@@ -167,8 +168,58 @@ test('token expiry clears events and open event details and offers reconnect wit
   await expect(page.locator('#googleEventContents')).toBeEmpty();
   await expect(page.locator('#googleCalendarStatus')).toContainText('期限が切れました');
   expect(await page.evaluate(() => window.googleMock.requests)).toBe(1);
+  await page.getByRole('button', { name: 'Googleに再接続', exact: true }).click();
+  await expect(page.locator('#googleCalendarStatus')).toContainText('最終更新');
+  expect(await page.evaluate(() => window.googleMock.requests)).toBe(2);
+  expect(await page.evaluate(() => window.googlePrompt)).toBe('');
+});
+
+for (const blockedStorage of [false, true]) test(`app ID persists before connecting and reconnects after reload with ${blockedStorage ? 'cookie fallback' : 'browser storage'}`, async ({ page }) => {
+  if (blockedStorage) await page.addInitScript(() => {
+    const read = Storage.prototype.getItem, write = Storage.prototype.setItem;
+    Storage.prototype.getItem = function(key) {
+      if (key === 'nsGoogleClientId') throw new DOMException('Storage blocked', 'SecurityError');
+      return read.call(this,key);
+    };
+    Storage.prototype.setItem = function(key,value) {
+      if (key === 'nsGoogleClientId') throw new DOMException('Storage blocked', 'SecurityError');
+      return write.call(this,key,value);
+    };
+  });
+  await openWeek(page);
   await openSettings(page);
-  await expect(page.locator('#googleCalendarConnect')).toHaveText('Googleに再接続');
+  await page.locator('#googleClientId').fill(clientId);
+  await expect(page.locator('#googleClientStorageStatus')).toContainText('保存しました');
+  await page.reload();
+  await page.getByRole('button', { name: /11月1日から11月7日の週を開く/ }).click();
+  await expect(page.locator('#googleClientId')).toHaveValue(clientId);
+  await expect(page.locator('#googleCalendarReconnect')).toBeEnabled();
+  expect(await page.evaluate(() => window.googleMock.requests)).toBe(0);
+  await page.locator('#googleCalendarReconnect').click();
+  await expect(page.locator('#googleCalendarStatus')).toContainText('最終更新');
+  await expect(page.locator('.google-timed-event')).toHaveCount(2);
+  expect(await page.evaluate(() => window.googleMock.requests)).toBe(1);
+  const cookies = await page.context().cookies();
+  expect(cookies.find(cookie => cookie.name === 'nsGoogleClientId').value).toBe(clientId);
+  expect(JSON.stringify(cookies)).not.toContain('fake-calendar-token');
+  expect(JSON.stringify(cookies)).not.toContain('会議A');
+});
+
+test('blocked app ID persistence is explained without preventing connection in the current tab', async ({ page }) => {
+  await page.addInitScript(() => {
+    const write = Storage.prototype.setItem;
+    Storage.prototype.setItem = function(key,value) {
+      if (key === 'nsGoogleClientId') throw new DOMException('Storage blocked', 'SecurityError');
+      return write.call(this,key,value);
+    };
+    Object.defineProperty(document,'cookie',{ get: () => '', set: () => {} });
+  });
+  await openWeek(page);
+  await openSettings(page);
+  await page.locator('#googleClientId').fill(clientId);
+  await expect(page.locator('#googleClientStorageStatus')).toContainText('保存できません');
+  await page.locator('#googleCalendarConnect').click();
+  await expect(page.locator('#googleCalendarStatus')).toContainText('最終更新');
 });
 
 for (const code of [401, 403]) test(`API response ${code} clears cached private events`, async ({ page }) => {

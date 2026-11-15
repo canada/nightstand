@@ -44,9 +44,25 @@
     const current = el('section','forecast-current');
     const currentIcon = icon(c.weather_code,!!c.is_day,options);
     const description = el('div');
-    description.append(el('p','forecast-caption',forecast.jma ? '現在の気温' : '現在の天気'),el('p','forecast-temperature',value(c.temperature_2m,'°')),el('p','forecast-description',c.description ? `${c.conditionCaption}：${c.description}` : currentIcon.description || '天気データなし'));
-    if (forecast.jma?.station) description.append(el('p','sheet-note',`${forecast.jma.station}観測所 · ${forecast.jma.observedAt.slice(5,10).replace('-','/')} ${forecast.jma.observedAt.slice(11,16)} 観測`));
+    const locationLabels = { device:'現在地周辺', query:'指定地点周辺', saved:'前回の場所周辺', default:'東京' };
+    const locationSource = forecast.location?.source;
+    const caption = locationLabels[locationSource] || '現在の気温';
+    description.append(el('p','forecast-caption',caption),el('p','forecast-temperature',value(c.temperature_2m,'°')),el('p','forecast-description',c.description ? `${c.conditionCaption}：${c.description}` : currentIcon.description || '天気データなし'));
     current.append(description,currentIcon.svg);root.append(current);
+    if (locationSource === 'saved' || locationSource === 'default') {
+      const notice = el('div','forecast-location-note');
+      const message = locationSource === 'saved'
+        ? '現在地を取得できなかったため、前回の場所を表示しています。'
+        : '現在地を取得できなかったため、東京の天気を表示しています。';
+      const retry = el('button','sheet-action','現在地で更新');
+      retry.type = 'button';
+      retry.addEventListener('click', async () => {
+        retry.disabled = true;
+        try { await options.retryLocation?.(); } finally { retry.disabled = false; }
+      });
+      notice.append(el('p','sheet-note',message),retry);
+      root.append(notice);
+    }
     const facts = el('dl','forecast-facts');
     const entries = [
       ['体感温度',value(c.apparent_temperature,'°')],
@@ -78,7 +94,6 @@
     if (!indices.length) hourly.append(el('p','sheet-note','時間別の予報はありません。'));
     hourlySection.append(hourly);root.append(hourlySection);
     const dailySection = el('section','forecast-section');dailySection.append(el('h3','','7日間の天気'));
-    if(forecast.jma?.forecast) dailySection.append(el('p','sheet-note forecast-region',forecast.jma.region));
     const days = el('div','forecast-days');
     for (let i=0;i<Math.min(7,d.time?.length || 0);i++) {
       const row = el('div','forecast-day');
@@ -89,22 +104,23 @@
       days.append(row);
     }
     dailySection.append(days);root.append(dailySection);
-    const updated = el('p','sheet-note forecast-source');
+    const footer = el('footer','forecast-footer');
     let timestamp = '—';
     if (Number.isFinite(forecast.fetchedAt)) {
       try {timestamp=new Intl.DateTimeFormat('ja-JP',{timeZone:forecast.timezone || 'Asia/Tokyo',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}).format(forecast.fetchedAt);}catch{}
     }
-    updated.append(document.createTextNode(`${timestamp} 更新 · ${forecast.timezone || '現地時刻'} · `));
+    footer.append(el('p','sheet-note',`${timestamp} 更新`));
+    const sources = el('details','sheet-note forecast-source');
+    sources.append(el('summary','','出典'));
+    const credits = el('p');
     function sourceLink(name,url) {const link=el('a','',name);link.href=url;link.target='_blank';link.rel='noopener noreferrer';return link;}
-    if(forecast.jma)updated.append(sourceLink('出典：気象庁',`https://www.jma.go.jp/bosai/forecast/#area_type=offices&area_code=${forecast.jma.office}`),document.createTextNode('（加工して表示）'));
-    if(forecast.hasModel)updated.append(document.createTextNode(forecast.jma?' · ':''),sourceLink('Open-Meteo','https://open-meteo.com/'));
     if(forecast.jma) {
-      const issued = el('span','sheet-note forecast-source-times');
-      const stamp = time => time ? `${time.slice(5,10).replace('-','/')} ${time.slice(11,16)}` : '—';
-      if(forecast.jma.forecast)issued.append(document.createTextNode(`府県予報 ${stamp(forecast.jma.shortIssuedAt)} ／ 週間予報 ${stamp(forecast.jma.weekIssuedAt)} 発表。気温の予報地点：${forecast.jma.temperatureNames.join('・')}。今日・明日の降水確率は6時間区分の最大値です。`));
-      updated.append(issued);
+      credits.append(sourceLink('気象庁',`https://www.jma.go.jp/bosai/forecast/#area_type=offices&area_code=${forecast.jma.office}`),document.createTextNode('の予報・観測データをもとにNightstandが作成。'));
     }
-    root.append(updated);
+    if(forecast.hasModel)credits.append(sourceLink('Open-Meteo','https://open-meteo.com/'));
+    sources.append(credits);
+    footer.append(sources);
+    root.append(footer);
     if(forecast.jmaUnavailable || forecast.modelUnavailable || forecast.jma && !forecast.jma.forecast && forecast.hasModel)root.append(el('p','sheet-note forecast-provider-note','一部の情報を取得できなかったため、取得できた情報や代替の予報を表示しています。'));
   }
   window.NightstandWeather = {render,showStatus};
